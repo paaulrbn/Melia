@@ -74,4 +74,5 @@ jobs:
             - **Windows** → `Melia_*_x64-setup.exe`
           releaseDraft: false
           prerelease: false
+          includeUpdaterJson: true
           args: ${{ matrix.args }}
