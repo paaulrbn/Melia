@@ -25,6 +25,8 @@ interface DownloadInfo {
   id: number;
   title: string;
   progress: number;
+  sizeStr?: string;
+  speed?: string;
   stats: string;
   status: 'downloading' | 'completed' | 'error' | 'paused';
   path?: string;
@@ -34,6 +36,21 @@ interface ProgressPayload {
   id: number;
   downloaded: number;
   total: number;
+  speed?: number;
+}
+
+interface AppInfo {
+  version: string;
+  default_download_dir: string;
+  os: string;
+  arch: string;
+}
+
+interface UpdateCheckResult {
+  available: boolean;
+  current_version: string;
+  latest_version?: string | null;
+  error?: string | null;
 }
 
 function formatSize(bytes: number): string {
@@ -44,12 +61,47 @@ function formatSize(bytes: number): string {
   return `${i === 0 ? value : value.toFixed(1)} ${units[i]}`;
 }
 
+function formatSpeed(bytesPerSec: number): string {
+  if (!bytesPerSec || bytesPerSec <= 0) return '';
+  const units = ['o/s', 'Ko/s', 'Mo/s', 'Go/s'];
+  const i = Math.min(Math.floor(Math.log(bytesPerSec) / Math.log(1024)), units.length - 1);
+  const value = bytesPerSec / Math.pow(1024, i);
+  return `${value.toFixed(1)} ${units[i]}`;
+}
+
 function App() {
   const [config, setConfig] = useState<Config>({});
   const [movies, setMovies] = useState<Movie[]>([]);
   const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
-  const [activeTab, setActiveTab] = useState<'movies' | 'downloads'>('movies');
-  const [downloads, setDownloads] = useState<Record<number, DownloadInfo>>({});
+  const [activeTab, setActiveTab] = useState<'movies' | 'downloads' | 'settings'>('movies');
+  const [downloads, setDownloads] = useState<Record<number, DownloadInfo>>(() => {
+    try {
+      const saved = localStorage.getItem("melia_downloads");
+      if (saved) {
+        const parsed: Record<number, DownloadInfo> = JSON.parse(saved);
+        const sanitized: Record<number, DownloadInfo> = {};
+        for (const [key, item] of Object.entries(parsed)) {
+          sanitized[Number(key)] = {
+            ...item,
+            status: item.status === 'downloading' ? 'paused' : item.status,
+            stats: item.status === 'downloading' ? 'En pause' : item.stats,
+          };
+        }
+        return sanitized;
+      }
+    } catch (e) {
+      console.error("Erreur lecture downloads localStorage:", e);
+    }
+    return {};
+  });
+  const [updateVersion, setUpdateVersion] = useState<string | null>(null);
+  const [isInstalling, setIsInstalling] = useState(false);
+  const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
+  const [downloadDir, setDownloadDir] = useState<string>(() => {
+    return localStorage.getItem("melia_download_dir") || "";
+  });
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateStatusText, setUpdateStatusText] = useState<string | null>(null);
 
   useEffect(() => {
     if (selectedMovie) {
@@ -59,20 +111,46 @@ function App() {
     }
   }, [selectedMovie]);
 
+  // Sauvegarder l'état des téléchargements dans le localStorage à chaque modification
+  useEffect(() => {
+    try {
+      localStorage.setItem("melia_downloads", JSON.stringify(downloads));
+    } catch (e) {
+      console.error("Erreur sauvegarde downloads localStorage:", e);
+    }
+  }, [downloads]);
+
   useEffect(() => {
     loadConfigAndData();
+    loadAppInfo();
+
+    // Vérifier les mises à jour au démarrage (délai de 3s pour ne pas bloquer le chargement)
+    const updateTimer = setTimeout(async () => {
+      try {
+        const res: UpdateCheckResult = await invoke("check_update");
+        if (res.available && res.latest_version) {
+          setUpdateVersion(res.latest_version);
+        }
+      } catch (e) {
+        console.log("Pas de mise à jour disponible ou hors ligne");
+      }
+    }, 3000);
 
     const unlisten = listen<ProgressPayload>("download_progress", (event) => {
       const payload = event.payload;
       if (payload.total) {
         const percent = Math.round((payload.downloaded / payload.total) * 100);
-        const stats = `${formatSize(payload.downloaded)} / ${formatSize(payload.total)}`;
+        const speedStr = payload.speed ? formatSpeed(payload.speed) : '';
+        const sizeStr = `${formatSize(payload.downloaded)} / ${formatSize(payload.total)}`;
+        const stats = speedStr ? `${sizeStr}   •   ${speedStr}` : sizeStr;
 
         setDownloads(prev => ({
           ...prev,
           [payload.id]: {
             ...prev[payload.id],
             progress: percent,
+            sizeStr,
+            speed: speedStr,
             stats,
             status: percent >= 100 ? 'completed' : 'downloading'
           }
@@ -81,9 +159,72 @@ function App() {
     });
 
     return () => {
+      clearTimeout(updateTimer);
       unlisten.then(f => f());
     };
   }, []);
+
+  const syncDownloadsWithDisk = async (moviesList: Movie[], targetDir: string) => {
+    if (!moviesList.length || !targetDir) return;
+    
+    const updated: Record<number, DownloadInfo> = {};
+    for (const movie of moviesList) {
+      if (!movie.movieFile) continue;
+      const ext = movie.movieFile.path.split('.').pop() || 'mkv';
+      const filename = `${movie.title} (${movie.year}).${ext}`;
+      const safeFilename = filename.replace(/\//g, '_').replace(/\\/g, '_');
+      const separator = targetDir.endsWith('/') || targetDir.endsWith('\\') ? '' : '/';
+      const filePath = `${targetDir}${separator}${safeFilename}`;
+
+      try {
+        const exists: boolean = await invoke("check_file_exists", { path: filePath });
+        if (exists) {
+          const sizeOnDisk: number | null = await invoke("get_file_size", { path: filePath });
+          const expectedSize = movie.movieFile.size;
+          
+          if (sizeOnDisk !== null && sizeOnDisk > 0) {
+            const isComplete = expectedSize > 0 ? sizeOnDisk >= expectedSize * 0.99 : true;
+            const progress = expectedSize > 0 ? Math.min(100, Math.round((sizeOnDisk / expectedSize) * 100)) : 100;
+            const stats = `${formatSize(sizeOnDisk)} / ${formatSize(expectedSize || sizeOnDisk)}`;
+            
+            updated[movie.id] = {
+              id: movie.id,
+              title: movie.title,
+              progress: isComplete ? 100 : progress,
+              stats: isComplete ? formatSize(sizeOnDisk) : stats,
+              status: isComplete ? 'completed' : 'paused',
+              path: filePath,
+            };
+          }
+        }
+      } catch (e) {
+        // Ignore
+      }
+    }
+
+    if (Object.keys(updated).length > 0) {
+      setDownloads(prev => ({
+        ...updated,
+        ...prev,
+      }));
+    }
+  };
+
+  const loadAppInfo = async () => {
+    try {
+      const info: AppInfo = await invoke("get_app_info");
+      setAppInfo(info);
+      const activeDir = localStorage.getItem("melia_download_dir") || info.default_download_dir;
+      if (!localStorage.getItem("melia_download_dir")) {
+        setDownloadDir(info.default_download_dir);
+      }
+      if (movies.length > 0 && activeDir) {
+        syncDownloadsWithDisk(movies, activeDir);
+      }
+    } catch (e) {
+      console.error("Erreur chargement app info:", e);
+    }
+  };
 
   const loadConfigAndData = async () => {
     try {
@@ -103,7 +244,13 @@ function App() {
       const url = `${baseUrl.replace(/\/$/, '')}/api/v3/movie?apiKey=${apiKey}`;
       const jsonStr: string = await invoke("fetch_radarr_movies", { url });
       const data: Movie[] = JSON.parse(jsonStr);
-      setMovies(data.filter(m => m.hasFile && m.movieFile).reverse());
+      const validMovies = data.filter(m => m.hasFile && m.movieFile).reverse();
+      setMovies(validMovies);
+
+      const targetDir = downloadDir || localStorage.getItem("melia_download_dir");
+      if (targetDir) {
+        syncDownloadsWithDisk(validMovies, targetDir);
+      }
     } catch (e) {
       console.error("Erreur chargement Radarr:", e);
     }
@@ -153,22 +300,34 @@ function App() {
         title: movie.title, 
         progress: prev[movie.id]?.progress || 0, 
         stats: "Démarrage...", 
-        status: 'downloading' 
+        status: 'downloading',
+        speed: undefined
       }
     }));
 
     try {
-      const savedPath = await invoke<string>("download_video", { url, filename, id: movie.id });
+      const customDir = downloadDir ? downloadDir : undefined;
+      const savedPath = await invoke<string>("download_video", { 
+        url, 
+        filename, 
+        id: movie.id,
+        customDir 
+      });
       setDownloads(prev => ({
         ...prev,
-        [movie.id]: { ...prev[movie.id], status: 'completed', path: savedPath, progress: 100 }
+        [movie.id]: { ...prev[movie.id], status: 'completed', path: savedPath, progress: 100, speed: undefined }
       }));
     } catch (e: any) {
       console.error(e);
       const isPaused = e.toString().includes("pause");
       setDownloads(prev => ({
         ...prev,
-        [movie.id]: { ...prev[movie.id], status: isPaused ? 'paused' : 'error', stats: isPaused ? 'En pause' : 'Erreur' }
+        [movie.id]: { 
+          ...prev[movie.id], 
+          status: isPaused ? 'paused' : 'error', 
+          stats: isPaused ? 'En pause' : 'Erreur',
+          speed: undefined 
+        }
       }));
     }
   };
@@ -176,9 +335,39 @@ function App() {
   const handleCancelDownload = async (id: number) => {
     try {
       await invoke("cancel_download", { id });
+      setDownloads(prev => {
+        if (!prev[id]) return prev;
+        return {
+          ...prev,
+          [id]: {
+            ...prev[id],
+            status: 'paused',
+            speed: undefined,
+          }
+        };
+      });
     } catch (e) {
       console.error(e);
     }
+  };
+
+  const handleDeleteDownload = async (id: number, deleteFromDisk: boolean = false) => {
+    const dl = downloads[id];
+    if (dl?.status === 'downloading') {
+      await handleCancelDownload(id);
+    }
+    if (deleteFromDisk && dl?.path) {
+      try {
+        await invoke("delete_file", { path: dl.path });
+      } catch (e) {
+        console.error("Erreur suppression fichier:", e);
+      }
+    }
+    setDownloads(prev => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
   };
 
   const handlePlayLocal = async (path: string) => {
@@ -189,7 +378,67 @@ function App() {
     }
   };
 
+  const handleSelectFolder = async () => {
+    try {
+      const selected: string | null = await invoke("select_folder");
+      if (selected) {
+        setDownloadDir(selected);
+        localStorage.setItem("melia_download_dir", selected);
+      }
+    } catch (e) {
+      console.error("Erreur sélection dossier:", e);
+    }
+  };
+
+  const handleOpenFolder = async () => {
+    try {
+      const path = downloadDir || appInfo?.default_download_dir || "";
+      if (path) {
+        await invoke("open_folder", { path });
+      }
+    } catch (e) {
+      console.error("Erreur ouverture dossier:", e);
+    }
+  };
+
+  const handleResetFolder = () => {
+    if (appInfo?.default_download_dir) {
+      setDownloadDir(appInfo.default_download_dir);
+      localStorage.removeItem("melia_download_dir");
+    }
+  };
+
+  const handleManualCheckUpdate = async () => {
+    setCheckingUpdate(true);
+    setUpdateStatusText(null);
+    try {
+      const res: UpdateCheckResult = await invoke("check_update");
+      if (res.available && res.latest_version) {
+        setUpdateVersion(res.latest_version);
+        setUpdateStatusText(`Mise à jour v${res.latest_version} disponible !`);
+      } else if (res.error) {
+        setUpdateStatusText(`Erreur : ${res.error}`);
+      } else {
+        setUpdateStatusText(`Vous utilisez la dernière version (v${res.current_version})`);
+      }
+    } catch (e: any) {
+      setUpdateStatusText(`Erreur : ${e?.message || e}`);
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
+
   const activeCount = Object.values(downloads).filter(d => d.status === 'downloading').length;
+
+  const handleInstallUpdate = async () => {
+    setIsInstalling(true);
+    try {
+      await invoke("install_update");
+    } catch (e) {
+      console.error("Erreur mise à jour:", e);
+      setIsInstalling(false);
+    }
+  };
 
   return (
     <div className="melia-app">
@@ -207,6 +456,9 @@ function App() {
           </button>
           <button className={`tab-btn ${activeTab === 'downloads' ? 'active' : ''}`} onClick={() => setActiveTab('downloads')}>
             Téléchargements {activeCount > 0 && <span className="badge">{activeCount}</span>}
+          </button>
+          <button className={`tab-btn ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
+            Paramètres
           </button>
         </div>
 
@@ -229,8 +481,10 @@ function App() {
                     <div className="movie-overlay">
                       <h3>{movie.title}</h3>
                       <span className="year">{movie.year}</span>
-                      {dl && dl.status === 'downloading' && (
-                        <div className="mini-progress-bar"><div className="fill" style={{width: `${dl.progress}%`}}></div></div>
+                      {dl && (dl.status === 'downloading' || dl.status === 'paused') && (
+                        <div className="mini-progress-bar">
+                          <div className={`fill ${dl.status === 'paused' ? 'paused' : ''}`} style={{width: `${dl.progress}%`}}></div>
+                        </div>
                       )}
                       {dl && dl.status === 'completed' && <div className="mini-status">▶ Téléchargé</div>}
                     </div>
@@ -257,7 +511,13 @@ function App() {
                 <div key={dl.id} className="download-item">
                   <div className="dl-info">
                     <h4>{dl.title}</h4>
-                    {dl.status !== 'completed' && <span className="dl-stats">{dl.stats}</span>}
+                    {dl.status !== 'completed' && (
+                      <span className="dl-stats">
+                        <span>{dl.sizeStr || dl.stats}</span>
+                        {dl.status === 'downloading' && dl.speed && <span className="dl-separator">•</span>}
+                        {dl.status === 'downloading' && dl.speed && <span>{dl.speed}</span>}
+                      </span>
+                    )}
                   </div>
                   <div className="dl-center">
                     {dl.status !== 'completed' && (
@@ -273,20 +533,124 @@ function App() {
                       </button>
                     )}
                     {dl.status === 'paused' && (
-                      <button className="btn-resume-small btn-icon" onClick={() => handleDownload(movies.find(m => m.id === dl.id)!)} title="Reprendre">
+                      <button className="btn-resume-small btn-icon" onClick={() => {
+                        const m = movies.find(movie => movie.id === dl.id);
+                        if (m) handleDownload(m);
+                      }} title="Reprendre">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
                       </button>
                     )}
                     {dl.status === 'completed' && dl.path && (
                       <button className="btn-play-small" onClick={() => handlePlayLocal(dl.path!)}>▶ Lancer</button>
                     )}
+                    <button
+                      className="btn-cancel-small btn-icon"
+                      onClick={() => handleDeleteDownload(dl.id, dl.status === 'completed')}
+                      title={dl.status === 'completed' ? "Supprimer" : "Annuler"}
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                      </svg>
+                    </button>
                   </div>
                 </div>
               ))}
             </div>
           )}
         </div>
+
+        <div style={{ display: activeTab === 'settings' ? 'block' : 'none' }} className="settings-view">
+          <h2>Paramètres</h2>
+
+          <div className="settings-list">
+            <div className="settings-item">
+              <div className="settings-item-info">
+                <h4>Dossier de téléchargement</h4>
+                <span className="settings-value" title={downloadDir || appInfo?.default_download_dir || ''}>
+                  {downloadDir || appInfo?.default_download_dir || 'Chargement…'}
+                </span>
+              </div>
+              <div className="settings-item-actions">
+                <button className="btn-small" onClick={handleSelectFolder}>
+                  Changer
+                </button>
+                <button className="btn-small" onClick={handleOpenFolder}>
+                  Ouvrir
+                </button>
+                {downloadDir && appInfo && downloadDir !== appInfo.default_download_dir && (
+                  <button className="btn-small btn-ghost" onClick={handleResetFolder}>
+                    Réinitialiser
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="settings-item">
+              <div className="settings-item-info">
+                <h4>Version</h4>
+                <span className="settings-value">
+                  v{appInfo?.version || '0.1.0'} {updateVersion ? `(v${updateVersion} disponible)` : ''}
+                </span>
+                {updateStatusText && (
+                  <span className="settings-status-text">{updateStatusText}</span>
+                )}
+              </div>
+              <div className="settings-item-actions">
+                <button
+                  className="btn-small"
+                  onClick={handleManualCheckUpdate}
+                  disabled={checkingUpdate || isInstalling}
+                >
+                  {checkingUpdate ? 'Vérification…' : 'Vérifier les mises à jour'}
+                </button>
+                {updateVersion && (
+                  <button
+                    className="btn-play-small"
+                    onClick={handleInstallUpdate}
+                    disabled={isInstalling}
+                  >
+                    {isInstalling ? 'Installation…' : 'Mettre à jour'}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="settings-item">
+              <div className="settings-item-info">
+                <h4>Radarr</h4>
+                <span className="settings-value">
+                  {config["RADARR_BASE_URL"] || 'Non configuré'} ({movies.length} {movies.length > 1 ? 'films' : 'film'})
+                </span>
+              </div>
+            </div>
+
+            <div className="settings-item">
+              <div className="settings-item-info">
+                <h4>Serveur média</h4>
+                <span className="settings-value">
+                  {config["MEDIA_SERVER_HOST"] || config["MEDIA_SERVER_DISPLAY_NAME"] || 'Non configuré'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
       </main>
+
+      {updateVersion && (
+        <div className="update-island">
+          <span className="update-dot" />
+          <span className="update-text">v{updateVersion} disponible</span>
+          <button className="update-cta" onClick={handleInstallUpdate} disabled={isInstalling}>
+            {isInstalling ? 'Installation…' : 'Installer'}
+          </button>
+          <button className="update-dismiss" onClick={() => setUpdateVersion(null)}>
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+              <path d="M1 1l8 8M9 1l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </button>
+        </div>
+      )}
 
       {selectedMovie && (
         <div className="modal-backdrop" onClick={() => setSelectedMovie(null)}>
@@ -328,7 +692,11 @@ function App() {
                     <div className="download-active-section">
                       <div className="progress-header">
                         <span>{dl.status === 'paused' ? 'Téléchargement en pause' : 'Téléchargement en cours...'} {dl.progress}%</span>
-                        <span className="download-stats">{dl.stats}</span>
+                        <span className="download-stats">
+                          <span>{dl.sizeStr || dl.stats}</span>
+                          {dl.status === 'downloading' && dl.speed && <span className="dl-separator">•</span>}
+                          {dl.status === 'downloading' && dl.speed && <span>{dl.speed}</span>}
+                        </span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                         <div className="progress-container" style={{ flex: 1, marginBottom: 0 }}>

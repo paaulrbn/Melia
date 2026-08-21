@@ -2,6 +2,7 @@ use std::process::Command;
 use url::Url;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use tauri::{AppHandle, Emitter};
+use tauri_plugin_updater::UpdaterExt;
 use reqwest::Client;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -14,6 +15,7 @@ struct ProgressPayload {
     id: u32,
     downloaded: u64,
     total: Option<u64>,
+    speed: Option<u64>,
 }
 
 #[tauri::command]
@@ -81,7 +83,7 @@ async fn fetch_radarr_movies(url: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn download_video(app: AppHandle, state: tauri::State<'_, DownloadState>, url: String, filename: String, id: u32) -> Result<String, String> {
+async fn download_video(app: AppHandle, state: tauri::State<'_, DownloadState>, url: String, filename: String, id: u32, custom_dir: Option<String>) -> Result<String, String> {
     println!("Début du téléchargement : {}", filename);
     let cancel_flag = Arc::new(AtomicBool::new(false));
     state.0.lock().unwrap().insert(id, cancel_flag.clone());
@@ -106,8 +108,15 @@ async fn download_video(app: AppHandle, state: tauri::State<'_, DownloadState>, 
         }
     }
 
-    let download_dir = dirs::download_dir().unwrap_or_else(|| std::env::temp_dir());
-    let melia_dir = download_dir.join("Melia");
+    let melia_dir = if let Some(dir) = custom_dir {
+        if !dir.trim().is_empty() {
+            std::path::PathBuf::from(dir)
+        } else {
+            dirs::download_dir().unwrap_or_else(|| std::env::temp_dir()).join("Melia")
+        }
+    } else {
+        dirs::download_dir().unwrap_or_else(|| std::env::temp_dir()).join("Melia")
+    };
     std::fs::create_dir_all(&melia_dir).map_err(|e| e.to_string())?;
     
     let safe_filename = filename.replace("/", "_").replace("\\", "_");
@@ -138,6 +147,7 @@ async fn download_video(app: AppHandle, state: tauri::State<'_, DownloadState>, 
             id,
             downloaded,
             total: Some(downloaded),
+            speed: None,
         });
         return Ok(file_path.to_str().unwrap().to_string());
     }
@@ -165,6 +175,9 @@ async fn download_video(app: AppHandle, state: tauri::State<'_, DownloadState>, 
     let mut writer = tokio::io::BufWriter::with_capacity(8 * 1024 * 1024, file);
     
     let mut last_emit_time = std::time::Instant::now();
+    let mut last_speed_calc_time = std::time::Instant::now();
+    let mut last_speed_downloaded = downloaded;
+    let mut current_speed: Option<u64> = None;
 
     while let Some(chunk) = response.chunk().await.map_err(|e| e.to_string())? {
         if cancel_flag.load(Ordering::SeqCst) {
@@ -176,11 +189,21 @@ async fn download_video(app: AppHandle, state: tauri::State<'_, DownloadState>, 
         writer.write_all(&chunk).await.map_err(|e| e.to_string())?;
         downloaded += chunk.len() as u64;
         
-        if last_emit_time.elapsed().as_millis() > 250 {
+        let speed_elapsed_ms = last_speed_calc_time.elapsed().as_millis();
+        if speed_elapsed_ms >= 1000 {
+            let bytes_diff = downloaded.saturating_sub(last_speed_downloaded);
+            let speed_bps = (bytes_diff as f64 / (speed_elapsed_ms as f64 / 1000.0)) as u64;
+            current_speed = Some(speed_bps);
+            last_speed_calc_time = std::time::Instant::now();
+            last_speed_downloaded = downloaded;
+        }
+
+        if last_emit_time.elapsed().as_millis() > 200 {
             let _ = app.emit("download_progress", ProgressPayload {
                 id,
                 downloaded,
                 total: total_size,
+                speed: current_speed,
             });
             last_emit_time = std::time::Instant::now();
         }
@@ -192,6 +215,7 @@ async fn download_video(app: AppHandle, state: tauri::State<'_, DownloadState>, 
         id,
         downloaded,
         total: total_size,
+        speed: None,
     });
 
     state.0.lock().unwrap().remove(&id);
@@ -263,12 +287,158 @@ fn play_video(url: String) -> Result<(), String> {
     Err("Impossible de lancer un lecteur vidéo. Veuillez installer IINA, VLC ou mpv.".to_string())
 }
 
+
+#[derive(serde::Serialize)]
+struct AppInfo {
+    version: String,
+    default_download_dir: String,
+    os: String,
+    arch: String,
+}
+
+#[tauri::command]
+fn get_app_info(app: AppHandle) -> AppInfo {
+    let version = app.package_info().version.to_string();
+    let default_download_dir = dirs::download_dir().unwrap_or_else(|| std::env::temp_dir()).join("Melia").to_string_lossy().to_string();
+    AppInfo {
+        version,
+        default_download_dir,
+        os: std::env::consts::OS.to_string(),
+        arch: std::env::consts::ARCH.to_string(),
+    }
+}
+
+#[tauri::command]
+async fn select_folder() -> Result<Option<String>, String> {
+    let folder = rfd::AsyncFileDialog::new()
+        .set_title("Choisir le dossier de téléchargement")
+        .pick_folder()
+        .await;
+
+    Ok(folder.map(|f| f.path().to_string_lossy().to_string()))
+}
+
+#[tauri::command]
+fn open_folder(path: String) -> Result<(), String> {
+    let path_obj = std::path::Path::new(&path);
+    if !path_obj.exists() {
+        let _ = std::fs::create_dir_all(path_obj);
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open").arg(&path).spawn().map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("explorer").arg(&path).spawn().map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        Command::new("xdg-open").arg(&path).spawn().map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+}
+
+#[derive(serde::Serialize)]
+struct UpdateCheckResult {
+    available: bool,
+    current_version: String,
+    latest_version: Option<String>,
+    error: Option<String>,
+}
+
+#[tauri::command]
+async fn check_update(app: AppHandle) -> Result<UpdateCheckResult, String> {
+    let current_version = app.package_info().version.to_string();
+    let updater = match app.updater() {
+        Ok(u) => u,
+        Err(e) => return Ok(UpdateCheckResult {
+            available: false,
+            current_version,
+            latest_version: None,
+            error: Some(e.to_string()),
+        }),
+    };
+
+    match updater.check().await {
+        Ok(Some(update)) => Ok(UpdateCheckResult {
+            available: true,
+            current_version,
+            latest_version: Some(update.version.to_string()),
+            error: None,
+        }),
+        Ok(None) => Ok(UpdateCheckResult {
+            available: false,
+            current_version,
+            latest_version: None,
+            error: None,
+        }),
+        Err(e) => Ok(UpdateCheckResult {
+            available: false,
+            current_version,
+            latest_version: None,
+            error: Some(e.to_string()),
+        }),
+    }
+}
+
+#[tauri::command]
+fn check_file_exists(path: String) -> bool {
+    std::path::Path::new(&path).exists()
+}
+
+#[tauri::command]
+fn delete_file(path: String) -> Result<(), String> {
+    let p = std::path::Path::new(&path);
+    if p.exists() {
+        std::fs::remove_file(p).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn get_file_size(path: String) -> Option<u64> {
+    std::fs::metadata(path).ok().map(|m| m.len())
+}
+
+#[tauri::command]
+async fn install_update(app: AppHandle) -> Result<(), String> {
+    let updater = app.updater().map_err(|e| e.to_string())?;
+    let update = updater.check().await.map_err(|e| e.to_string())?;
+    if let Some(update) = update {
+        println!("Installation de la mise à jour v{}", update.version);
+        update.download_and_install(|_, _| {}, || {}).await.map_err(|e| e.to_string())?;
+        app.restart();
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(DownloadState(Mutex::new(HashMap::new())))
-        .invoke_handler(tauri::generate_handler![play_video, download_video, get_config, fetch_radarr_movies, cancel_download])
+        .invoke_handler(tauri::generate_handler![
+            play_video,
+            download_video,
+            get_config,
+            fetch_radarr_movies,
+            cancel_download,
+            check_update,
+            install_update,
+            get_app_info,
+            select_folder,
+            open_folder,
+            check_file_exists,
+            delete_file,
+            get_file_size
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
