@@ -24,21 +24,35 @@ fn cancel_download(state: tauri::State<DownloadState>, id: u32) {
 }
 
 #[tauri::command]
-fn get_config() -> HashMap<String, String> {
+fn get_config(app: tauri::AppHandle) -> HashMap<String, String> {
+    use tauri::Manager;
+
+    // App bundlée : lire le .env depuis le dossier resources
+    if let Ok(resource_dir) = app.path().resource_dir() {
+        let env_path = resource_dir.join(".env");
+        if let Ok(content) = std::fs::read_to_string(&env_path) {
+            for line in content.lines() {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with('#') { continue; }
+                if let Some((k, v)) = line.split_once('=') {
+                    std::env::set_var(k.trim(), v.trim());
+                }
+            }
+        }
+    }
+
+    // Fallback développement local : lire ../.env ou .env
     dotenv::dotenv().ok();
-    
     if let Ok(content) = std::fs::read_to_string("../.env").or_else(|_| std::fs::read_to_string(".env")) {
         for line in content.lines() {
             let line = line.trim();
-            if line.is_empty() || line.starts_with('#') {
-                continue;
-            }
+            if line.is_empty() || line.starts_with('#') { continue; }
             if let Some((k, v)) = line.split_once('=') {
                 std::env::set_var(k.trim(), v.trim());
             }
         }
     }
-    
+
     let mut config = HashMap::new();
     let keys = vec![
         "MEDIA_SERVER_DISPLAY_NAME", "MEDIA_SERVER_HOST", "MEDIA_SERVER_PORT",
@@ -46,7 +60,7 @@ fn get_config() -> HashMap<String, String> {
         "RADARR_BASE_URL", "RADARR_API_KEY",
         "SONARR_BASE_URL", "SONARR_API_KEY"
     ];
-    
+
     for key in keys {
         if let Ok(val) = std::env::var(key) {
             config.insert(key.to_string(), val);
@@ -54,7 +68,7 @@ fn get_config() -> HashMap<String, String> {
             config.insert(key.to_string(), "".to_string());
         }
     }
-    
+
     config
 }
 
