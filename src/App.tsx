@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { load } from "@tauri-apps/plugin-store";
 import "./App.css";
 
 interface Config {
@@ -48,8 +49,10 @@ function App() {
   const [config, setConfig] = useState<Config>({});
   const [movies, setMovies] = useState<Movie[]>([]);
   const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
-  const [activeTab, setActiveTab] = useState<'movies' | 'downloads'>('movies');
+  const [activeTab, setActiveTab] = useState<'movies' | 'downloads' | 'settings'>('movies');
   const [downloads, setDownloads] = useState<Record<number, DownloadInfo>>({});
+  const [settingsForm, setSettingsForm] = useState<Config>({});
+  const [settingsSaved, setSettingsSaved] = useState(false);
 
   useEffect(() => {
     if (selectedMovie) {
@@ -85,16 +88,67 @@ function App() {
     };
   }, []);
 
+  const STORE_KEYS = [
+    "MEDIA_SERVER_DISPLAY_NAME", "MEDIA_SERVER_HOST", "MEDIA_SERVER_PORT",
+    "MEDIA_SERVER_USERNAME", "MEDIA_SERVER_PASSWORD", "MEDIA_SERVER_ROOT_PATH",
+    "RADARR_BASE_URL", "RADARR_API_KEY",
+    "SONARR_BASE_URL", "SONARR_API_KEY"
+  ];
+
   const loadConfigAndData = async () => {
     try {
-      const conf: Config = await invoke("get_config");
+      // 1. Charger depuis le store persistant
+      const store = await load("settings.json", { autoSave: true });
+      const storeConf: Config = {};
+      for (const key of STORE_KEYS) {
+        const val = await store.get<string>(key);
+        if (val) storeConf[key] = val;
+      }
+
+      // 2. Si le store est vide, fallback sur le .env via Rust
+      let conf: Config;
+      if (Object.values(storeConf).some(v => v)) {
+        conf = storeConf;
+      } else {
+        conf = await invoke("get_config");
+        // Pré-remplir le store avec le .env si trouvé
+        if (Object.values(conf).some(v => v)) {
+          for (const key of STORE_KEYS) {
+            if (conf[key]) await store.set(key, conf[key]);
+          }
+          await store.save();
+        }
+      }
+
       setConfig(conf);
-      
+      setSettingsForm(conf);
+
       if (conf["RADARR_BASE_URL"] && conf["RADARR_API_KEY"]) {
         fetchMovies(conf["RADARR_BASE_URL"], conf["RADARR_API_KEY"]);
+      } else {
+        setActiveTab('settings');
       }
     } catch (e) {
       console.error("Erreur chargement config:", e);
+    }
+  };
+
+  const saveSettings = async () => {
+    try {
+      const store = await load("settings.json", { autoSave: true });
+      for (const key of STORE_KEYS) {
+        await store.set(key, settingsForm[key] || "");
+      }
+      await store.save();
+      setConfig(settingsForm);
+      setSettingsSaved(true);
+      setTimeout(() => setSettingsSaved(false), 2000);
+      if (settingsForm["RADARR_BASE_URL"] && settingsForm["RADARR_API_KEY"]) {
+        fetchMovies(settingsForm["RADARR_BASE_URL"], settingsForm["RADARR_API_KEY"]);
+        setActiveTab('movies');
+      }
+    } catch (e) {
+      console.error("Erreur sauvegarde:", e);
     }
   };
 
@@ -208,6 +262,9 @@ function App() {
           <button className={`tab-btn ${activeTab === 'downloads' ? 'active' : ''}`} onClick={() => setActiveTab('downloads')}>
             Téléchargements {activeCount > 0 && <span className="badge">{activeCount}</span>}
           </button>
+          <button className={`tab-btn ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
+            ⚙ Paramètres
+          </button>
         </div>
 
       </header>
@@ -285,6 +342,75 @@ function App() {
               ))}
             </div>
           )}
+        </div>
+
+        <div style={{ display: activeTab === 'settings' ? 'block' : 'none' }} className="settings-view">
+          <h2>Paramètres</h2>
+
+          <div className="settings-section">
+            <h3>Serveur média</h3>
+            {[
+              { key: "MEDIA_SERVER_DISPLAY_NAME", label: "Nom affiché", type: "text", placeholder: "Ma seedbox" },
+              { key: "MEDIA_SERVER_HOST", label: "Hôte", type: "text", placeholder: "exemple.seedhost.eu" },
+              { key: "MEDIA_SERVER_PORT", label: "Port", type: "text", placeholder: "443" },
+              { key: "MEDIA_SERVER_ROOT_PATH", label: "Chemin racine", type: "text", placeholder: "/utilisateur" },
+              { key: "MEDIA_SERVER_USERNAME", label: "Nom d'utilisateur", type: "text", placeholder: "" },
+              { key: "MEDIA_SERVER_PASSWORD", label: "Mot de passe", type: "password", placeholder: "" },
+            ].map(({ key, label, type, placeholder }) => (
+              <div className="settings-field" key={key}>
+                <label>{label}</label>
+                <input
+                  type={type}
+                  value={settingsForm[key] || ""}
+                  placeholder={placeholder}
+                  onChange={e => setSettingsForm(prev => ({ ...prev, [key]: e.target.value }))}
+                />
+              </div>
+            ))}
+          </div>
+
+          <div className="settings-section">
+            <h3>Radarr</h3>
+            {[
+              { key: "RADARR_BASE_URL", label: "URL de base", type: "text", placeholder: "https://hôte/radarr" },
+              { key: "RADARR_API_KEY", label: "Clé API", type: "text", placeholder: "" },
+              { key: "RADARR_ROOT_FOLDER", label: "Dossier racine", type: "text", placeholder: "/downloads/Movies" },
+            ].map(({ key, label, type, placeholder }) => (
+              <div className="settings-field" key={key}>
+                <label>{label}</label>
+                <input
+                  type={type}
+                  value={settingsForm[key] || ""}
+                  placeholder={placeholder}
+                  onChange={e => setSettingsForm(prev => ({ ...prev, [key]: e.target.value }))}
+                />
+              </div>
+            ))}
+          </div>
+
+          <div className="settings-section">
+            <h3>Sonarr</h3>
+            {[
+              { key: "SONARR_BASE_URL", label: "URL de base", type: "text", placeholder: "https://hôte/sonarr" },
+              { key: "SONARR_API_KEY", label: "Clé API", type: "text", placeholder: "" },
+            ].map(({ key, label, type, placeholder }) => (
+              <div className="settings-field" key={key}>
+                <label>{label}</label>
+                <input
+                  type={type}
+                  value={settingsForm[key] || ""}
+                  placeholder={placeholder}
+                  onChange={e => setSettingsForm(prev => ({ ...prev, [key]: e.target.value }))}
+                />
+              </div>
+            ))}
+          </div>
+
+          <div className="settings-actions">
+            <button className="btn-primary" onClick={saveSettings}>
+              {settingsSaved ? "✓ Sauvegardé !" : "Sauvegarder"}
+            </button>
+          </div>
         </div>
       </main>
 
