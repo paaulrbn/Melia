@@ -117,6 +117,8 @@ function App() {
             let payloadStr = decodeURIComponent(parts[1]);
             // Supprimer tout slash ou espace ajouté à la fin par Windows/Navigateurs
             payloadStr = payloadStr.replace(/[\/\s]+$/, '');
+            console.log("[DeepLink] Payload:", payloadStr);
+            console.log("[DeepLink] Payload length:", payloadStr.length);
             setConfigPayload(payloadStr);
             setShowConfigPrompt(true);
             setConfigError(null);
@@ -129,15 +131,30 @@ function App() {
     }
   };
 
+  const safeAtob = (base64: string) => {
+    let b64 = base64;
+    while (b64.length % 4 !== 0) {
+      b64 += '=';
+    }
+    return atob(b64);
+  };
+
   const handleDecrypt = async () => {
     if (!configPayload || !configPassword) return;
     try {
+      console.log("[Decrypt] Full payload:", configPayload);
+      console.log("[Decrypt] Password length:", configPassword.length);
       const [saltB64, ivB64, authTagB64, encryptedB64] = configPayload.split(':');
+      console.log("[Decrypt] saltB64:", saltB64, "len:", saltB64?.length);
+      console.log("[Decrypt] ivB64:", ivB64, "len:", ivB64?.length);
+      console.log("[Decrypt] authTagB64:", authTagB64, "len:", authTagB64?.length);
+      console.log("[Decrypt] encryptedB64:", encryptedB64?.substring(0, 30) + "...", "len:", encryptedB64?.length);
       
-      const salt = Uint8Array.from(atob(saltB64), c => c.charCodeAt(0));
-      const iv = Uint8Array.from(atob(ivB64), c => c.charCodeAt(0));
-      const authTag = Uint8Array.from(atob(authTagB64), c => c.charCodeAt(0));
-      const encrypted = Uint8Array.from(atob(encryptedB64), c => c.charCodeAt(0));
+      const salt = Uint8Array.from(safeAtob(saltB64), c => c.charCodeAt(0));
+      const iv = Uint8Array.from(safeAtob(ivB64), c => c.charCodeAt(0));
+      const authTag = Uint8Array.from(safeAtob(authTagB64), c => c.charCodeAt(0));
+      const encrypted = Uint8Array.from(safeAtob(encryptedB64), c => c.charCodeAt(0));
+      console.log("[Decrypt] salt bytes:", salt.length, "iv bytes:", iv.length, "authTag bytes:", authTag.length, "encrypted bytes:", encrypted.length);
 
       const enc = new TextEncoder();
       const keyMaterial = await window.crypto.subtle.importKey("raw", enc.encode(configPassword), {name: "PBKDF2"}, false, ["deriveKey"]);
