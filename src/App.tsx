@@ -114,7 +114,10 @@ function App() {
         try {
           const parts = urlStr.split('?data=');
           if (parts.length > 1) {
-            setConfigPayload(decodeURIComponent(parts[1]));
+            let payloadStr = decodeURIComponent(parts[1]);
+            // Supprimer tout slash ou espace ajouté à la fin par Windows/Navigateurs
+            payloadStr = payloadStr.replace(/[\/\s]+$/, '');
+            setConfigPayload(payloadStr);
             setShowConfigPrompt(true);
             setConfigError(null);
             setConfigPassword("");
@@ -170,9 +173,9 @@ function App() {
       
       setShowConfigPrompt(false);
       setConfigPayload(null);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      setConfigError("Mot de passe incorrect ou données corrompues.");
+      setConfigError(`Erreur: ${e.message || 'Mot de passe incorrect ou données corrompues.'}`);
     }
   };
 
@@ -842,7 +845,7 @@ function App() {
               value={configPassword}
               onChange={e => setConfigPassword(e.target.value)}
               placeholder="Mot de passe"
-              style={{ width: '100%', padding: '12px', marginTop: '15px', marginBottom: '20px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '8px', fontSize: '15px', outline: 'none' }}
+              style={{ width: '100%', boxSizing: 'border-box', padding: '12px', marginTop: '15px', marginBottom: '20px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', colorScheme: 'dark', borderRadius: '8px', fontSize: '15px', outline: 'none' }}
               onKeyDown={e => { if(e.key === 'Enter') handleDecrypt(); }}
             />
             {configError && <p style={{ color: '#ff4d4f', fontSize: '0.9em', marginTop: 0, marginBottom: '15px' }}>{configError}</p>}
