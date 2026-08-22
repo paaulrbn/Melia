@@ -1,6 +1,6 @@
 [package]
 name = "tauri-app"
-version = "0.1.4"
+version = "0.1.0"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -34,4 +34,5 @@ base64 = "0.23.1"
 percent-encoding = "2.3.2"
 dirs = "6.0.0"
 dotenv = "0.15.0"
+tauri-plugin-deep-link = "2.0.0"
 

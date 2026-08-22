@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrent, onOpenUrl } from '@tauri-apps/plugin-deep-link';
 import "./App.css";
 
 interface Config {
@@ -103,6 +104,78 @@ function App() {
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updateStatusText, setUpdateStatusText] = useState<string | null>(null);
 
+  const [showConfigPrompt, setShowConfigPrompt] = useState(false);
+  const [configPayload, setConfigPayload] = useState<string | null>(null);
+  const [configPassword, setConfigPassword] = useState("");
+  const [configError, setConfigError] = useState<string | null>(null);
+  const handleDeepLink = (urls: string[]) => {
+    for (const urlStr of urls) {
+      if (urlStr.startsWith('melia://config')) {
+        try {
+          const parts = urlStr.split('?data=');
+          if (parts.length > 1) {
+            setConfigPayload(decodeURIComponent(parts[1]));
+            setShowConfigPrompt(true);
+            setConfigError(null);
+            setConfigPassword("");
+          }
+        } catch (e) {
+          console.error("URL invalide", e);
+        }
+      }
+    }
+  };
+
+  const handleDecrypt = async () => {
+    if (!configPayload || !configPassword) return;
+    try {
+      const [saltB64, ivB64, authTagB64, encryptedB64] = configPayload.split(':');
+      
+      const salt = Uint8Array.from(atob(saltB64), c => c.charCodeAt(0));
+      const iv = Uint8Array.from(atob(ivB64), c => c.charCodeAt(0));
+      const authTag = Uint8Array.from(atob(authTagB64), c => c.charCodeAt(0));
+      const encrypted = Uint8Array.from(atob(encryptedB64), c => c.charCodeAt(0));
+
+      const enc = new TextEncoder();
+      const keyMaterial = await window.crypto.subtle.importKey("raw", enc.encode(configPassword), {name: "PBKDF2"}, false, ["deriveKey"]);
+      
+      const key = await window.crypto.subtle.deriveKey(
+        { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
+        keyMaterial,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["decrypt"]
+      );
+
+      const ciphertext = new Uint8Array(encrypted.length + authTag.length);
+      ciphertext.set(encrypted);
+      ciphertext.set(authTag, encrypted.length);
+
+      const decryptedBuffer = await window.crypto.subtle.decrypt(
+        { name: "AES-GCM", iv },
+        key,
+        ciphertext
+      );
+
+      const dec = new TextDecoder();
+      const decryptedString = dec.decode(decryptedBuffer);
+      const parsedConfig = JSON.parse(decryptedString);
+
+      localStorage.setItem("melia_config", JSON.stringify(parsedConfig));
+      setConfig(parsedConfig);
+      
+      if (parsedConfig["RADARR_BASE_URL"] && parsedConfig["RADARR_API_KEY"]) {
+        fetchMovies(parsedConfig["RADARR_BASE_URL"], parsedConfig["RADARR_API_KEY"]);
+      }
+      
+      setShowConfigPrompt(false);
+      setConfigPayload(null);
+    } catch (e) {
+      console.error(e);
+      setConfigError("Mot de passe incorrect ou données corrompues.");
+    }
+  };
+
   useEffect(() => {
     if (selectedMovie) {
       document.body.style.overflow = 'hidden';
@@ -124,7 +197,19 @@ function App() {
     loadConfigAndData();
     loadAppInfo();
 
-    // Vérifier les mises à jour au démarrage (délai de 3s pour ne pas bloquer le chargement)
+    getCurrent().then(urls => {
+      if (urls && urls.length > 0) {
+        handleDeepLink(urls);
+      }
+    }).catch(console.error);
+
+    let unlistenDeepLink: (() => void) | undefined;
+    onOpenUrl((urls) => {
+      handleDeepLink(urls);
+    }).then(unlisten => {
+      unlistenDeepLink = unlisten;
+    }).catch(console.error);
+
     const updateTimer = setTimeout(async () => {
       try {
         const res: UpdateCheckResult = await invoke("check_update");
@@ -161,6 +246,7 @@ function App() {
     return () => {
       clearTimeout(updateTimer);
       unlisten.then(f => f());
+      if (unlistenDeepLink) unlistenDeepLink();
     };
   }, []);
 
@@ -228,7 +314,19 @@ function App() {
 
   const loadConfigAndData = async () => {
     try {
-      const conf: Config = await invoke("get_config");
+      let conf: Config = {};
+      
+      const savedConfig = localStorage.getItem("melia_config");
+      if (savedConfig) {
+        try {
+          conf = JSON.parse(savedConfig);
+        } catch (e) {}
+      }
+      
+      if (Object.keys(conf).length === 0) {
+        conf = await invoke("get_config");
+      }
+      
       setConfig(conf);
       
       if (conf["RADARR_BASE_URL"] && conf["RADARR_API_KEY"]) {
@@ -629,7 +727,7 @@ function App() {
               <div className="settings-item-info">
                 <h4>Serveur média</h4>
                 <span className="settings-value">
-                  {config["MEDIA_SERVER_HOST"] || config["MEDIA_SERVER_DISPLAY_NAME"] || 'Non configuré'}
+                  {config["MEDIA_SERVER_HOST"] || 'Non configuré'}
                 </span>
               </div>
             </div>
@@ -729,6 +827,28 @@ function App() {
                   );
                 }
               })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showConfigPrompt && (
+        <div className="modal-backdrop">
+          <div className="modal-content" style={{ padding: '30px', maxWidth: '400px', margin: 'auto', marginTop: '100px' }}>
+            <h2>Import de configuration</h2>
+            <p>Veuillez entrer le mot de passe pour charger votre configuration Melia.</p>
+            <input 
+              type="password" 
+              value={configPassword}
+              onChange={e => setConfigPassword(e.target.value)}
+              placeholder="Mot de passe"
+              style={{ width: '100%', padding: '12px', marginTop: '15px', marginBottom: '20px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '8px', fontSize: '15px', outline: 'none' }}
+              onKeyDown={e => { if(e.key === 'Enter') handleDecrypt(); }}
+            />
+            {configError && <p style={{ color: '#ff4d4f', fontSize: '0.9em', marginTop: 0, marginBottom: '15px' }}>{configError}</p>}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button className="btn-small btn-ghost" onClick={() => setShowConfigPrompt(false)}>Annuler</button>
+              <button className="btn-small" style={{ background: 'white', color: 'black', fontWeight: 600 }} onClick={handleDecrypt}>Charger</button>
             </div>
           </div>
         </div>

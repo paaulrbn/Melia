@@ -57,10 +57,10 @@ fn get_config(app: tauri::AppHandle) -> HashMap<String, String> {
 
     let mut config = HashMap::new();
     let keys = vec![
-        "MEDIA_SERVER_DISPLAY_NAME", "MEDIA_SERVER_HOST", "MEDIA_SERVER_PORT",
+        "MEDIA_SERVER_HOST", "MEDIA_SERVER_PORT",
         "MEDIA_SERVER_USERNAME", "MEDIA_SERVER_PASSWORD", "MEDIA_SERVER_ROOT_PATH",
-        "RADARR_BASE_URL", "RADARR_API_KEY",
-        "SONARR_BASE_URL", "SONARR_API_KEY"
+        "RADARR_BASE_URL", "RADARR_API_KEY", "RADARR_ROOT_FOLDER",
+        "SONARR_BASE_URL", "SONARR_API_KEY", "SONARR_ROOT_FOLDER"
     ];
 
     for key in keys {
@@ -352,16 +352,20 @@ struct UpdateCheckResult {
     error: Option<String>,
 }
 
+fn get_app_updater(app: &AppHandle) -> Result<tauri_plugin_updater::Updater, String> {
+    app.updater_builder().build().map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 async fn check_update(app: AppHandle) -> Result<UpdateCheckResult, String> {
     let current_version = app.package_info().version.to_string();
-    let updater = match app.updater() {
+    let updater = match get_app_updater(&app) {
         Ok(u) => u,
         Err(e) => return Ok(UpdateCheckResult {
             available: false,
             current_version,
             latest_version: None,
-            error: Some(e.to_string()),
+            error: Some(e),
         }),
     };
 
@@ -408,7 +412,7 @@ fn get_file_size(path: String) -> Option<u64> {
 
 #[tauri::command]
 async fn install_update(app: AppHandle) -> Result<(), String> {
-    let updater = app.updater().map_err(|e| e.to_string())?;
+    let updater = get_app_updater(&app)?;
     let update = updater.check().await.map_err(|e| e.to_string())?;
     if let Some(update) = update {
         println!("Installation de la mise à jour v{}", update.version);
@@ -421,6 +425,15 @@ async fn install_update(app: AppHandle) -> Result<(), String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_deep_link::init())
+        .setup(|_app| {
+            #[cfg(any(windows, target_os = "linux"))]
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                let _ = _app.deep_link().register_all();
+            }
+            Ok(())
+        })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(DownloadState(Mutex::new(HashMap::new())))

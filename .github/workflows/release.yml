@@ -42,23 +42,6 @@ jobs:
       - name: Install frontend dependencies
         run: npm install
 
-      - name: Create .env file
-        shell: bash
-        run: |
-          cat > .env << ENVEOF
-          MEDIA_SERVER_DISPLAY_NAME=${{ secrets.MEDIA_SERVER_DISPLAY_NAME }}
-          MEDIA_SERVER_HOST=${{ secrets.MEDIA_SERVER_HOST }}
-          MEDIA_SERVER_PORT=${{ secrets.MEDIA_SERVER_PORT }}
-          MEDIA_SERVER_USERNAME=${{ secrets.MEDIA_SERVER_USERNAME }}
-          MEDIA_SERVER_PASSWORD=${{ secrets.MEDIA_SERVER_PASSWORD }}
-          MEDIA_SERVER_ROOT_PATH=${{ secrets.MEDIA_SERVER_ROOT_PATH }}
-          RADARR_BASE_URL=${{ secrets.RADARR_BASE_URL }}
-          RADARR_API_KEY=${{ secrets.RADARR_API_KEY }}
-          RADARR_ROOT_FOLDER=${{ secrets.RADARR_ROOT_FOLDER }}
-          SONARR_BASE_URL=${{ secrets.SONARR_BASE_URL }}
-          SONARR_API_KEY=${{ secrets.SONARR_API_KEY }}
-          ENVEOF
-
       - name: Build and release
         uses: tauri-apps/tauri-action@v0
         env:
