@@ -1,11 +1,13 @@
 import React, { useEffect } from 'react';
-import { CloseIcon } from './Icons';
+import { X } from 'lucide-react';
+import { IconButton } from '../ui';
 
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   children: React.ReactNode;
   contentClassName?: string;
+  backdropClassName?: string;
   contentStyle?: React.CSSProperties;
   showCloseButton?: boolean;
 }
@@ -15,6 +17,7 @@ export function Modal({
   onClose,
   children,
   contentClassName = 'modal-content',
+  backdropClassName = '',
   contentStyle,
   showCloseButton = true,
 }: ModalProps) {
@@ -37,11 +40,16 @@ export function Modal({
   if (!isOpen) return null;
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div className={`modal-backdrop ${backdropClassName}`.trim()} onClick={onClose}>
       {showCloseButton && (
-        <button className="close-btn" onClick={onClose} aria-label="Fermer">
-          <CloseIcon />
-        </button>
+        <IconButton
+          icon={<X size={20} />}
+          onClick={onClose}
+          aria-label="Fermer"
+          className="close-btn"
+          shape="circle"
+          size="lg"
+        />
       )}
       <div
         className={contentClassName}

@@ -165,7 +165,7 @@ pub async fn download_video(
         downloaded += chunk.len() as u64;
 
         let speed_elapsed_ms = last_speed_calc_time.elapsed().as_millis();
-        if speed_elapsed_ms >= 1000 {
+        if speed_elapsed_ms >= 500 {
             let bytes_diff = downloaded.saturating_sub(last_speed_downloaded);
             let speed_bps = (bytes_diff as f64 / (speed_elapsed_ms as f64 / 1000.0)) as u64;
             current_speed = Some(speed_bps);

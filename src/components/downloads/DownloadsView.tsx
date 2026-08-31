@@ -1,5 +1,6 @@
 import { DownloadInfo, Movie, QueueRecord } from '../../types';
 import { formatSize } from '../../utils/formatters';
+import { Badge, ProgressBar } from '../ui';
 import { DownloadItem } from './DownloadItem';
 
 interface DownloadsViewProps {
@@ -54,15 +55,7 @@ export function DownloadsView({
                 }}
               >
                 Téléchargements sur le serveur
-                <span
-                  className="badge"
-                  style={{
-                    backgroundColor: 'var(--status-server)',
-                    boxShadow: '0 0 10px rgba(59, 130, 246, 0.4)',
-                  }}
-                >
-                  {serverQueueList.length}
-                </span>
+                <Badge variant="server">{serverQueueList.length}</Badge>
               </h3>
               <div className="downloads-list">
                 {serverQueueList.map(queueItem => {
@@ -98,16 +91,7 @@ export function DownloadsView({
                       </div>
 
                       <div className="dl-center">
-                        <div className="progress-container">
-                          <div
-                            className="progress-bar"
-                            style={{
-                              width: `${progress}%`,
-                              backgroundColor: 'var(--status-server)',
-                              boxShadow: '0 0 15px rgba(59, 130, 246, 0.4)',
-                            }}
-                          />
-                        </div>
+                        <ProgressBar value={progress} variant="server" size="md" />
                       </div>
 
                       <div className="dl-actions">
@@ -144,9 +128,7 @@ export function DownloadsView({
               >
                 Téléchargements locaux
                 {localDownloadList.length > 0 && (
-                  <span className="badge">
-                    {localDownloadList.length}
-                  </span>
+                  <Badge variant="accent">{localDownloadList.length}</Badge>
                 )}
               </h3>
             )}

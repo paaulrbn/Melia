@@ -1,5 +1,6 @@
 import { DownloadInfo, LookupMovie, Movie, QueueRecord } from '../../types';
-import { SearchIcon, CloseIcon } from '../common/Icons';
+import { Search, X } from 'lucide-react';
+import { Input, IconButton } from '../ui';
 import { MovieCard } from './MovieCard';
 
 interface MoviesViewProps {
@@ -41,19 +42,27 @@ export function MoviesView({
 
       {/* Search bar */}
       <div className="search-bar">
-        <SearchIcon className="search-icon" />
-        <input
+        <Input
           type="text"
-          className="search-input"
+          inputSize="lg"
           placeholder="Rechercher un film..."
           value={searchQuery}
           onChange={e => onSearchChange(e.target.value)}
+          leftIcon={<Search size={18} />}
+          rightElement={
+            searchQuery ? (
+              <IconButton
+                icon={<X size={16} />}
+                onClick={onClearSearch}
+                aria-label="Effacer la recherche"
+                size="sm"
+                shape="circle"
+                variant="ghost"
+                className="search-clear"
+              />
+            ) : undefined
+          }
         />
-        {searchQuery && (
-          <button className="search-clear" onClick={onClearSearch} aria-label="Effacer la recherche">
-            <CloseIcon size={14} />
-          </button>
-        )}
       </div>
 
       {/* Search results */}
@@ -89,7 +98,7 @@ export function MoviesView({
         )
       ) : movies.length === 0 ? (
         <div className="loading-state">
-          <p>Chargement de la bibliothèque ou Radarr non configuré...</p>
+          <p>Chargement de la bibliothèque ou serveur non configuré...</p>
         </div>
       ) : (
         /* Library categorized */

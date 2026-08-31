@@ -62,20 +62,25 @@ export function useDownloads() {
           timeRemainingStr = formatTime(remainingSeconds);
         }
 
-        const speedAndTime = [speedStr, timeRemainingStr].filter(Boolean).join('   •   ');
-        const stats = speedAndTime ? `${sizeStr}   •   ${speedAndTime}` : sizeStr;
+        setDownloads(prev => {
+          const current = prev[payload.id];
+          const activeSpeed = speedStr || current?.speed;
+          const speedAndTime = [activeSpeed, timeRemainingStr].filter(Boolean).join('   •   ');
+          const stats = speedAndTime ? `${sizeStr}   •   ${speedAndTime}` : sizeStr;
 
-        setDownloads(prev => ({
-          ...prev,
-          [payload.id]: {
-            ...prev[payload.id],
-            progress: percent,
-            sizeStr,
-            speed: speedStr,
-            stats,
-            status: percent >= 100 ? 'completed' : 'downloading',
-          },
-        }));
+          return {
+            ...prev,
+            [payload.id]: {
+              ...current,
+              id: payload.id,
+              progress: percent,
+              sizeStr,
+              speed: activeSpeed,
+              stats,
+              status: percent >= 100 ? 'completed' : 'downloading',
+            },
+          };
+        });
       }
     });
 
@@ -204,9 +209,14 @@ export function useDownloads() {
     if (Object.keys(updated).length > 0) {
       setDownloads(prev => {
         let hasChange = false;
+        const next = { ...prev };
         for (const [idStr, newInfo] of Object.entries(updated)) {
           const id = Number(idStr);
           const current = prev[id];
+          // NEVER overwrite an ongoing download with disk scan state
+          if (current?.status === 'downloading') {
+            continue;
+          }
           if (
             !current ||
             current.status !== newInfo.status ||
@@ -215,11 +225,14 @@ export function useDownloads() {
             current.stats !== newInfo.stats
           ) {
             hasChange = true;
-            break;
+            next[id] = {
+              ...current,
+              ...newInfo,
+            };
           }
         }
         if (!hasChange) return prev;
-        return { ...prev, ...updated };
+        return next;
       });
     }
   }, []);

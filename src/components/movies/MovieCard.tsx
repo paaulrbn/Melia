@@ -1,5 +1,7 @@
 import { DownloadInfo, LookupMovie, Movie, QueueRecord } from '../../types';
 import { getImageUrl } from '../../utils/media';
+import { Play, Plus } from 'lucide-react';
+import { ProgressBar } from '../ui';
 
 interface MovieCardProps {
   movie: Movie | LookupMovie;
@@ -31,26 +33,37 @@ export function MovieCard({
         <h3>{movie.title}</h3>
         <span className="year">{movie.year}</span>
 
-        {isAddHint && <div className="mini-status add-hint">+ Ajouter</div>}
-
-        {download && (download.status === 'downloading' || download.status === 'paused') && (
-          <div className="mini-progress-bar">
-            <div
-              className={`fill ${download.status === 'paused' ? 'paused' : ''}`}
-              style={{ width: `${download.progress}%` }}
-            />
+        {isAddHint && (
+          <div className="mini-status add-hint">
+            <Plus size={13} />
+            <span>Ajouter</span>
           </div>
         )}
 
+        {download && (download.status === 'downloading' || download.status === 'paused') && (
+          <ProgressBar
+            value={download.progress}
+            isPaused={download.status === 'paused'}
+            size="xs"
+            style={{ marginTop: '10px' }}
+          />
+        )}
+
         {download && download.status === 'completed' && (
-          <div className="mini-status">▶ Téléchargé</div>
+          <div className="mini-status">
+            <Play size={12} fill="currentColor" />
+            <span>Téléchargé</span>
+          </div>
         )}
 
         {queueItem && (
           <>
-            <div className="mini-progress-bar">
-              <div className="fill" style={{ width: `${serverProgress}%` }} />
-            </div>
+            <ProgressBar
+              value={serverProgress}
+              variant="server"
+              size="xs"
+              style={{ marginTop: '10px' }}
+            />
             <div className="mini-status">
               En cours : {queueItem.timeleft || `${serverProgress}%`}
             </div>

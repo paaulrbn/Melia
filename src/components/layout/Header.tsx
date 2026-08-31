@@ -1,6 +1,7 @@
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { TabType } from '../../types';
-import { SettingsGearIcon } from '../common/Icons';
+import { Settings } from 'lucide-react';
+import { Badge } from '../ui';
 
 interface HeaderProps {
   activeTab: TabType;
@@ -31,7 +32,7 @@ export function Header({ activeTab, setActiveTab, activeDownloadCount }: HeaderP
           className={`tab-btn ${activeTab === 'downloads' ? 'active' : ''}`}
           onClick={() => setActiveTab('downloads')}
         >
-          Téléchargements {activeDownloadCount > 0 && <span className="badge">{activeDownloadCount}</span>}
+          Téléchargements {activeDownloadCount > 0 && <Badge variant="accent">{activeDownloadCount}</Badge>}
         </button>
         <button
           className={`tab-btn tab-btn-icon ${activeTab === 'settings' ? 'active' : ''}`}
@@ -39,7 +40,7 @@ export function Header({ activeTab, setActiveTab, activeDownloadCount }: HeaderP
           title="Paramètres"
           aria-label="Paramètres"
         >
-          <SettingsGearIcon />
+          <Settings size={18} />
         </button>
       </div>
     </header>

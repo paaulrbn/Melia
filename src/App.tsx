@@ -159,6 +159,7 @@ function App() {
         onDownload={m => downloadsManager.handleDownload(m, configManager.config)}
         onCancelDownload={downloadsManager.handleCancelDownload}
         onPlayLocal={playVideo}
+        onDeleteDownload={downloadsManager.handleDeleteDownload}
         onDeleteServerMovie={moviesManager.handleDeleteServerMovie}
       />
 

@@ -1,5 +1,7 @@
 import { AppInfo, Config } from '../../types';
 import { CONFIG_FIELDS } from '../../utils/constants';
+import { Check } from 'lucide-react';
+import { Button, Input } from '../ui';
 
 interface SettingsViewProps {
   downloadDir: string;
@@ -63,16 +65,16 @@ export function SettingsView({
             </span>
           </div>
           <div className="settings-item-actions">
-            <button className="btn-small" onClick={onSelectFolder}>
+            <Button variant="secondary" size="sm" onClick={onSelectFolder}>
               Changer
-            </button>
-            <button className="btn-small" onClick={onOpenFolder}>
+            </Button>
+            <Button variant="secondary" size="sm" onClick={onOpenFolder}>
               Ouvrir
-            </button>
+            </Button>
             {isCustomFolder && (
-              <button className="btn-small btn-ghost" onClick={onResetFolder}>
+              <Button variant="ghost" size="sm" onClick={onResetFolder}>
                 Réinitialiser
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -82,28 +84,32 @@ export function SettingsView({
           <div className="settings-item-info">
             <h4>Version</h4>
             <span className="settings-value">
-              v{appInfo?.version || '0.1.0'} {updateVersion ? `(v${updateVersion} disponible)` : ''}
+              v{appInfo?.version || '0.2.0'} {updateVersion ? `(v${updateVersion} disponible)` : ''}
             </span>
             {updateStatusText && (
               <span className="settings-status-text">{updateStatusText}</span>
             )}
           </div>
           <div className="settings-item-actions">
-            <button
-              className="btn-small"
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={onManualCheckUpdate}
               disabled={checkingUpdate || isInstalling}
+              isLoading={checkingUpdate}
             >
               {checkingUpdate ? 'Vérification…' : 'Vérifier les mises à jour'}
-            </button>
+            </Button>
             {updateVersion && (
-              <button
-                className="btn-play-small"
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={onInstallUpdate}
                 disabled={isInstalling}
+                isLoading={isInstalling}
               >
                 {isInstalling ? 'Installation…' : 'Mettre à jour'}
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -119,10 +125,11 @@ export function SettingsView({
               <div className="config-grid">
                 {CONFIG_FIELDS.map(field => (
                   <div key={field.key} className="config-row">
-                    <div className="config-label">{field.label}</div>
-                    <input
+                    <Input
+                      label={field.label}
                       type={field.type || 'text'}
-                      className="settings-input"
+                      inputSize="sm"
+                      fullWidth
                       placeholder={field.placeholder}
                       value={editingConfig[field.key] || ''}
                       onChange={e =>
@@ -132,25 +139,13 @@ export function SettingsView({
                   </div>
                 ))}
               </div>
-              <div
-                className="config-actions"
-                style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}
-              >
-                {configSaved && (
-                  <span className="settings-saved-text" style={{ marginRight: 'auto', alignSelf: 'center' }}>
-                    ✓ Configuration sauvegardée
-                  </span>
-                )}
-                <button className="btn-small" onClick={onCancelEditing}>
+              <div className="config-actions">
+                <Button variant="secondary" size="sm" onClick={onCancelEditing}>
                   Annuler
-                </button>
-                <button
-                  className="btn-small"
-                  style={{ background: 'white', color: 'black', fontWeight: 600, border: 'none' }}
-                  onClick={onSaveConfig}
-                >
+                </Button>
+                <Button variant="primary" size="sm" onClick={onSaveConfig}>
                   Sauvegarder
-                </button>
+                </Button>
               </div>
             </>
           ) : (
@@ -167,13 +162,16 @@ export function SettingsView({
                   </div>
                 ))}
               </div>
-              <div
-                className="config-actions"
-                style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}
-              >
-                <button className="btn-small" onClick={onStartEditing}>
+              <div className="config-actions">
+                {configSaved && (
+                  <span className="settings-saved-text" style={{ marginRight: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Check size={16} />
+                    Configuration sauvegardée
+                  </span>
+                )}
+                <Button variant="secondary" size="sm" onClick={onStartEditing}>
                   Modifier
-                </button>
+                </Button>
               </div>
             </>
           )}

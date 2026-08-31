@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { DownloadInfo, Movie, QueueRecord } from '../../types';
 import { formatSize } from '../../utils/formatters';
 import { getImageUrl } from '../../utils/media';
 import { Modal } from '../common/Modal';
-import { PlayIcon, PauseIcon, TrashIcon } from '../common/Icons';
+import { ConfirmModal } from '../common/ConfirmModal';
+import { Play, Pause, Trash2, Download } from 'lucide-react';
+import { Button, IconButton, ProgressBar } from '../ui';
 
 interface MovieDetailModalProps {
   movie: Movie | null;
@@ -13,6 +16,7 @@ interface MovieDetailModalProps {
   onDownload: (movie: Movie) => void;
   onCancelDownload: (movieId: number) => void;
   onPlayLocal: (filePath: string) => void;
+  onDeleteDownload: (movieId: number, deleteFromDisk: boolean) => void;
   onDeleteServerMovie: (movieId: number) => void;
 }
 
@@ -25,10 +29,14 @@ export function MovieDetailModal({
   onDownload,
   onCancelDownload,
   onPlayLocal,
+  onDeleteDownload,
   onDeleteServerMovie,
 }: MovieDetailModalProps) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
   if (!movie) return null;
 
+  const isLocalMovie = movieStatus === 'local' || (download?.status === 'completed' && !!download.path);
   const fanartUrl = getImageUrl(movie, 'fanart');
 
   const renderActions = () => {
@@ -46,8 +54,8 @@ export function MovieDetailModal({
               <span className="download-stats">{queueItem.timeleft || 'Calcul en cours...'}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-              <div className="progress-container" style={{ flex: 1, marginBottom: 0 }}>
-                <div className="progress-bar" style={{ width: `${progress}%` }} />
+              <div style={{ flex: 1 }}>
+                <ProgressBar value={progress} variant="server" size="md" />
               </div>
             </div>
           </div>
@@ -57,7 +65,7 @@ export function MovieDetailModal({
       return (
         <div className="modal-actions">
           <p className="unavailable-text">
-            Ce film n'est pas encore disponible sur le serveur. Radarr est en attente de téléchargement.
+            Ce film n'est pas encore disponible sur le serveur. En attente de téléchargement.
           </p>
         </div>
       );
@@ -67,19 +75,24 @@ export function MovieDetailModal({
       return (
         <div className="modal-actions">
           {movie.movieFile && (
-            <button className="btn-primary" onClick={() => onDownload(movie)}>
-              ⬇ Télécharger ce film
-            </button>
+            <Button
+              variant="primary"
+              size="lg"
+              leftIcon={<Download size={20} />}
+              onClick={() => onDownload(movie)}
+            >
+              Télécharger ce film
+            </Button>
           )}
-          <button
-            className="btn-cancel-small btn-icon"
+          <IconButton
+            icon={<Trash2 size={20} />}
+            variant="danger"
+            size="lg"
             style={{ marginLeft: 'auto' }}
-            onClick={() => onDeleteServerMovie(movie.id)}
+            onClick={() => setShowDeleteConfirm(true)}
             title="Supprimer du serveur"
             aria-label="Supprimer du serveur"
-          >
-            <TrashIcon size={18} />
-          </button>
+          />
         </div>
       );
     }
@@ -98,32 +111,33 @@ export function MovieDetailModal({
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-            <div className="progress-container" style={{ flex: 1, marginBottom: 0 }}>
-              <div
-                className={`progress-bar ${download.status === 'paused' ? 'paused' : ''}`}
-                style={{ width: `${download.progress}%` }}
+            <div style={{ flex: 1 }}>
+              <ProgressBar
+                value={download.progress}
+                isPaused={download.status === 'paused'}
+                size="md"
               />
             </div>
             <div className="dl-actions">
               {download.status === 'downloading' && (
-                <button
-                  className="btn-cancel-small btn-icon"
+                <IconButton
+                  icon={<Pause size={18} fill="currentColor" />}
+                  variant="secondary"
+                  size="md"
                   onClick={() => onCancelDownload(movie.id)}
                   title="Pause"
                   aria-label="Mettre en pause"
-                >
-                  <PauseIcon size={18} />
-                </button>
+                />
               )}
               {download.status === 'paused' && (
-                <button
-                  className="btn-resume-small btn-icon"
+                <IconButton
+                  icon={<Play size={18} fill="currentColor" />}
+                  variant="secondary"
+                  size="md"
                   onClick={() => onDownload(movie)}
                   title="Reprendre"
                   aria-label="Reprendre le téléchargement"
-                >
-                  <PlayIcon size={18} />
-                </button>
+                />
               )}
             </div>
           </div>
@@ -134,23 +148,23 @@ export function MovieDetailModal({
     if (download.status === 'completed' && download.path) {
       return (
         <div className="modal-actions">
-          <button
-            className="btn-primary"
-            style={{ display: 'flex', gap: '8px', alignItems: 'center' }}
+          <Button
+            variant="primary"
+            size="lg"
+            leftIcon={<Play size={20} fill="currentColor" />}
             onClick={() => onPlayLocal(download.path!)}
           >
-            <PlayIcon size={20} />
             Lancer le film
-          </button>
-          <button
-            className="btn-cancel-small btn-icon"
+          </Button>
+          <IconButton
+            icon={<Trash2 size={20} />}
+            variant="danger"
+            size="lg"
             style={{ marginLeft: 'auto' }}
-            onClick={() => onDeleteServerMovie(movie.id)}
-            title="Supprimer du serveur"
-            aria-label="Supprimer du serveur"
-          >
-            <TrashIcon size={18} />
-          </button>
+            onClick={() => setShowDeleteConfirm(true)}
+            title="Supprimer des téléchargements"
+            aria-label="Supprimer le téléchargement local"
+          />
         </div>
       );
     }
@@ -159,28 +173,61 @@ export function MovieDetailModal({
   };
 
   return (
-    <Modal isOpen={!!movie} onClose={onClose}>
-      <div
-        className="modal-header"
-        style={{ backgroundImage: fanartUrl ? `url(${fanartUrl})` : undefined }}
-      >
-        <div className="modal-header-gradient">
-          <div className="modal-title-area">
-            <h2>
-              {movie.title} <span className="modal-year">({movie.year})</span>
-            </h2>
+    <>
+      <Modal isOpen={!!movie} onClose={onClose}>
+        <div
+          className="modal-header"
+          style={{ backgroundImage: fanartUrl ? `url(${fanartUrl})` : undefined }}
+        >
+          <div className="modal-header-gradient">
+            <div className="modal-title-area">
+              <h2>
+                {movie.title} <span className="modal-year">({movie.year})</span>
+              </h2>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="modal-body">
-        <p className="overview">{movie.overview || 'Aucun résumé disponible.'}</p>
-        {movie.movieFile && (
-          <p className="file-size-info">{formatSize(movie.movieFile.size)}</p>
-        )}
+        <div className="modal-body">
+          <p className="overview">{movie.overview || 'Aucun résumé disponible.'}</p>
+          {movie.movieFile && (
+            <p className="file-size-info">{formatSize(movie.movieFile.size)}</p>
+          )}
 
-        {renderActions()}
-      </div>
-    </Modal>
+          {renderActions()}
+        </div>
+      </Modal>
+
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        title={isLocalMovie ? 'Supprimer le téléchargement' : 'Supprimer du serveur'}
+        message={
+          isLocalMovie ? (
+            <>
+              Voulez-vous vraiment supprimer <strong>{movie.title} ({movie.year})</strong> de vos téléchargements locaux&nbsp;?
+              Le fichier vidéo sera définitivement effacé de votre disque.
+            </>
+          ) : (
+            <>
+              Voulez-vous vraiment supprimer <strong>{movie.title} ({movie.year})</strong> du serveur&nbsp;?
+              Le film et ses fichiers vidéo associés seront définitivement effacés.
+            </>
+          )
+        }
+        confirmLabel={isLocalMovie ? 'Supprimer le fichier' : 'Supprimer du serveur'}
+        cancelLabel="Annuler"
+        variant="danger"
+        onConfirm={() => {
+          setShowDeleteConfirm(false);
+          if (isLocalMovie) {
+            onDeleteDownload(movie.id, true);
+          } else {
+            onDeleteServerMovie(movie.id);
+          }
+          onClose();
+        }}
+        onClose={() => setShowDeleteConfirm(false)}
+      />
+    </>
   );
 }

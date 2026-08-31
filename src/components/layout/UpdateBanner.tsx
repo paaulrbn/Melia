@@ -1,4 +1,5 @@
-import { CloseIcon } from '../common/Icons';
+import { X } from 'lucide-react';
+import { IconButton } from '../ui';
 
 interface UpdateBannerProps {
   updateVersion: string | null;
@@ -22,9 +23,14 @@ export function UpdateBanner({
       <button className="update-cta" onClick={onInstall} disabled={isInstalling}>
         {isInstalling ? 'Installation…' : 'Installer'}
       </button>
-      <button className="update-dismiss" onClick={onDismiss} aria-label="Ignorer la mise à jour">
-        <CloseIcon size={12} />
-      </button>
+      <IconButton
+        icon={<X size={12} />}
+        onClick={onDismiss}
+        aria-label="Ignorer la mise à jour"
+        size="sm"
+        variant="ghost"
+        className="update-dismiss"
+      />
     </div>
   );
 }

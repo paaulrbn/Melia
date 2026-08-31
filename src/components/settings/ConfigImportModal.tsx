@@ -1,4 +1,5 @@
 import { Modal } from '../common/Modal';
+import { Button, Input } from '../ui';
 
 interface ConfigImportModalProps {
   isOpen: boolean;
@@ -32,50 +33,33 @@ export function ConfigImportModal({
       showCloseButton={false}
     >
       <h2>Import de configuration</h2>
-      <p>Veuillez entrer le mot de passe pour charger votre configuration Melia.</p>
+      <p style={{ color: 'var(--text-secondary)', marginBottom: '20px' }}>
+        Veuillez entrer le mot de passe pour charger votre configuration Melia.
+      </p>
 
-      <input
-        type="password"
-        value={password}
-        onChange={e => onPasswordChange(e.target.value)}
-        placeholder="Mot de passe"
-        style={{
-          width: '100%',
-          boxSizing: 'border-box',
-          padding: '12px',
-          marginTop: '15px',
-          marginBottom: '20px',
-          background: 'rgba(255,255,255,0.05)',
-          border: '1px solid rgba(255,255,255,0.1)',
-          color: 'white',
-          colorScheme: 'dark',
-          borderRadius: '8px',
-          fontSize: '15px',
-          outline: 'none',
-        }}
-        onKeyDown={e => {
-          if (e.key === 'Enter') onDecrypt();
-        }}
-        autoFocus
-      />
-
-      {error && (
-        <p style={{ color: '#ff4d4f', fontSize: '0.9em', marginTop: 0, marginBottom: '15px' }}>
-          {error}
-        </p>
-      )}
+      <div style={{ marginBottom: '20px' }}>
+        <Input
+          type="password"
+          inputSize="md"
+          fullWidth
+          value={password}
+          onChange={e => onPasswordChange(e.target.value)}
+          placeholder="Mot de passe"
+          error={error || undefined}
+          onKeyDown={e => {
+            if (e.key === 'Enter') onDecrypt();
+          }}
+          autoFocus
+        />
+      </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-        <button className="btn-small btn-ghost" onClick={onClose}>
+        <Button variant="ghost" size="sm" onClick={onClose}>
           Annuler
-        </button>
-        <button
-          className="btn-small"
-          style={{ background: 'white', color: 'black', fontWeight: 600 }}
-          onClick={onDecrypt}
-        >
+        </Button>
+        <Button variant="primary" size="sm" onClick={onDecrypt}>
           Charger
-        </button>
+        </Button>
       </div>
     </Modal>
   );

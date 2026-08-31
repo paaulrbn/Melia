@@ -1,0 +1,22 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap');
+
+/* ==========================================================================
+   Design Tokens & CSS Variables
+   ========================================================================== */
+:root {
+  --bg-base: #050505;
+  --bg-surface: rgba(10, 10, 10, 0.7);
+  --bg-surface-solid: #0c0c0c;
+  --text-primary: #ffffff;
+  --text-secondary: #a3a3a3;
+  --accent-primary: #E50914; /* Cinematic Red */
+  --accent-glow: rgba(229, 9, 20, 0.4);
+  --font-display: 'Bebas Neue', sans-serif;
+  --font-body: 'Outfit', sans-serif;
+  --glass-blur: blur(24px);
+  --transition-smooth: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  --header-height: 62px;
+  --status-local: #22c55e;
+  --status-server: #3b82f6;
+  --status-unavailable: #6b7280;
+}
