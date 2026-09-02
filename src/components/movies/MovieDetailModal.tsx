@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { DownloadInfo, Movie, QueueRecord } from '../../types';
-import { formatSize } from '../../utils/formatters';
+import { formatDuration, formatSize } from '../../utils/formatters';
 import { getImageUrl } from '../../utils/media';
 import { Modal } from '../common/Modal';
 import { ConfirmModal } from '../common/ConfirmModal';
@@ -51,7 +51,9 @@ export function MovieDetailModal({
           <div className="download-active-section">
             <div className="progress-header">
               <span>Téléchargement serveur en cours... {progress}%</span>
-              <span className="download-stats">{queueItem.timeleft || 'Calcul en cours...'}</span>
+              <span className="download-stats download-stats--server">
+                {queueItem.timeleft || 'Calcul en cours...'}
+              </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
               <div style={{ flex: 1 }}>
@@ -189,10 +191,21 @@ export function MovieDetailModal({
         </div>
 
         <div className="modal-body">
-          <p className="overview">{movie.overview || 'Aucun résumé disponible.'}</p>
-          {movie.movieFile && (
-            <p className="file-size-info">{formatSize(movie.movieFile.size)}</p>
+          {(movie.runtime || movie.movieFile) && (
+            <div className="modal-meta-row">
+              {movie.runtime && movie.runtime > 0 ? (
+                <span className="movie-runtime">{formatDuration(movie.runtime)}</span>
+              ) : null}
+              {movie.runtime && movie.runtime > 0 && movie.movieFile ? (
+                <span className="meta-dot">•</span>
+              ) : null}
+              {movie.movieFile && (
+                <span className="file-size-info">{formatSize(movie.movieFile.size)}</span>
+              )}
+            </div>
           )}
+
+          <p className="overview">{movie.overview || 'Aucun résumé disponible.'}</p>
 
           {renderActions()}
         </div>

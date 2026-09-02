@@ -43,17 +43,8 @@ export function DownloadsView({
         <>
           {/* Server Downloads (Radarr) */}
           {serverQueueList.length > 0 && (
-            <div className="downloads-section" style={{ marginBottom: '35px' }}>
-              <h3
-                className="category-title"
-                style={{
-                  fontSize: '1.3rem',
-                  marginBottom: '15px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                }}
-              >
+            <div className="downloads-section">
+              <h3 className="downloads-section-title">
                 Téléchargements sur le serveur
                 <Badge variant="server">{serverQueueList.length}</Badge>
               </h3>
@@ -81,7 +72,7 @@ export function DownloadsView({
                     >
                       <div className="dl-info">
                         <h4 title={title}>{title}</h4>
-                        <span className="dl-stats" style={{ color: 'var(--status-server)' }}>
+                        <span className="dl-stats">
                           <span>{sizeStr}</span>
                           {queueItem.timeleft && <span className="dl-separator">•</span>}
                           {queueItem.timeleft && (
@@ -95,14 +86,7 @@ export function DownloadsView({
                       </div>
 
                       <div className="dl-actions">
-                        <span
-                          style={{
-                            fontSize: '0.85rem',
-                            fontWeight: 600,
-                            color: 'var(--status-server)',
-                            fontVariantNumeric: 'tabular-nums',
-                          }}
-                        >
+                        <span className="dl-percentage dl-percentage--server">
                           {progress}%
                         </span>
                       </div>
@@ -116,16 +100,7 @@ export function DownloadsView({
           {/* Local Downloads (Melia) */}
           <div className="downloads-section">
             {serverQueueList.length > 0 && (
-              <h3
-                className="category-title"
-                style={{
-                  fontSize: '1.3rem',
-                  marginBottom: '15px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                }}
-              >
+              <h3 className="downloads-section-title">
                 Téléchargements locaux
                 {localDownloadList.length > 0 && (
                   <Badge variant="accent">{localDownloadList.length}</Badge>
@@ -145,19 +120,24 @@ export function DownloadsView({
               </p>
             ) : (
               <div className="downloads-list">
-                {localDownloadList.map(dl => (
-                  <DownloadItem
-                    key={dl.id}
-                    download={dl}
-                    onPause={onPause}
-                    onResume={id => {
-                      const m = movies.find(movie => movie.id === id);
-                      if (m) onResume(m);
-                    }}
-                    onPlay={onPlay}
-                    onDelete={onDelete}
-                  />
-                ))}
+                {localDownloadList.map(dl => {
+                  const movie = movies.find(m => m.id === dl.id);
+                  return (
+                    <DownloadItem
+                      key={dl.id}
+                      download={dl}
+                      movie={movie}
+                      onSelectMovie={onSelectMovie}
+                      onPause={onPause}
+                      onResume={id => {
+                        const m = movies.find(movieItem => movieItem.id === id);
+                        if (m) onResume(m);
+                      }}
+                      onPlay={onPlay}
+                      onDelete={onDelete}
+                    />
+                  );
+                })}
               </div>
             )}
           </div>

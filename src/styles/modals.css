@@ -73,34 +73,35 @@
 }
 
 .modal-title-area {
-  padding: 40px;
+  padding: var(--space-2xl) var(--space-xl) var(--space-xl);
   width: 100%;
 }
 
 .modal-title-area h2 {
   margin: 0;
-  font-family: var(--font-display);
-  font-size: 3.5rem;
-  text-transform: uppercase;
-  line-height: 0.9;
-  letter-spacing: 1.5px;
-  text-shadow: 0 8px 25px rgba(0, 0, 0, 0.9);
+  font-family: var(--font-heading);
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  text-transform: none;
+  line-height: 1.15;
+  letter-spacing: -0.5px;
+  text-shadow: 0 4px 16px rgba(0, 0, 0, 0.8);
 }
 
 .modal-year {
-  font-family: var(--font-body);
-  font-weight: 300;
-  font-size: 1.8rem;
+  font-family: var(--font-heading);
+  font-weight: 400;
+  font-size: 1.4rem;
   color: var(--text-secondary);
   letter-spacing: 0;
   text-transform: none;
-  vertical-align: middle;
-  margin-left: 15px;
+  vertical-align: baseline;
+  margin-left: var(--space-xs);
   text-shadow: none;
 }
 
 .modal-body {
-  padding: 0 40px 50px;
+  padding: 0 var(--space-xl) var(--space-2xl);
   position: relative;
   z-index: 2;
 }
@@ -114,10 +115,31 @@
   font-weight: 300;
 }
 
+.modal-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  margin-bottom: 18px;
+  font-family: var(--font-body);
+}
+
+.movie-runtime {
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+  font-variant-numeric: tabular-nums;
+}
+
+.meta-dot {
+  opacity: 0.4;
+  font-size: 0.75rem;
+}
+
 .file-size-info {
   font-size: 0.82rem;
   color: var(--text-secondary);
-  margin: 0 0 28px;
+  margin: 0;
   letter-spacing: 0.03em;
   font-variant-numeric: tabular-nums;
 }
@@ -264,7 +286,7 @@
   margin-top: 25px;
   padding: 16px 20px;
   background: rgba(255, 255, 255, 0.03);
-  border-radius: 22px;
+  border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
@@ -330,12 +352,12 @@
 }
 
 .confirm-modal-title {
-  margin: 0 0 8px 0;
-  font-family: var(--font-body);
-  font-size: 1.15rem;
+  margin: 0 0 var(--space-xs) 0;
+  font-family: var(--font-heading);
+  font-size: var(--text-md);
   font-weight: 600;
   color: var(--text-primary);
-  letter-spacing: 0.2px;
+  letter-spacing: -0.2px;
 }
 
 .confirm-modal-message {

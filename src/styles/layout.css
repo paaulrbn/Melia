@@ -21,31 +21,33 @@
 .melia-header h1 {
   margin: 0;
   color: var(--accent-primary);
-  font-family: var(--font-display);
-  font-size: 2.0rem;
-  letter-spacing: 2px;
+  font-family: var(--font-heading);
+  font-size: 1.65rem;
+  font-weight: 700;
+  letter-spacing: -0.5px;
   text-shadow: 0 0 20px var(--accent-glow);
   user-select: none;
 }
 
 .header-tabs {
   display: flex;
-  gap: 40px;
+  gap: var(--space-xl);
 }
 
 .tab-btn {
   background: transparent;
   color: var(--text-secondary);
   border: none;
-  font-size: 1.05rem;
+  font-size: var(--text-base);
   font-weight: 500;
+  letter-spacing: -0.2px;
   cursor: pointer;
-  padding: 8px 0;
+  padding: var(--space-xs) 0;
   position: relative;
   transition: var(--transition-smooth);
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-xs);
   font-family: var(--font-body);
 }
 
@@ -107,8 +109,8 @@
    Main Content Wrapper
    ========================================================================== */
 .melia-content {
-  padding: 30px 50px 60px;
-  padding-top: calc(var(--header-height) + 30px);
+  padding: var(--space-xl) 50px 60px;
+  padding-top: calc(var(--header-height) + var(--space-xl));
   flex-grow: 1;
   max-width: 1600px;
   margin: 0 auto;
@@ -116,23 +118,23 @@
 }
 
 .melia-content h2 {
-  font-family: var(--font-display);
-  font-size: 2.2rem;
-  letter-spacing: 1.5px;
-  margin-bottom: 30px;
-  font-weight: 400;
-  text-transform: uppercase;
+  font-family: var(--font-heading);
+  font-size: var(--text-xl);
+  letter-spacing: -0.3px;
+  margin-bottom: var(--space-xl);
+  font-weight: 600;
+  text-transform: none;
   color: var(--text-primary);
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: var(--space-sm);
 }
 
 .melia-content h2::before {
   content: '';
   display: block;
-  width: 5px;
-  height: 28px;
+  width: 4px;
+  height: 22px;
   background-color: var(--accent-primary);
   box-shadow: 0 0 8px var(--accent-glow);
   border-radius: 2px;

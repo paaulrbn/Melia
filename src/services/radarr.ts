@@ -51,13 +51,25 @@ export async function addRadarrMovie(params: AddMovieParams): Promise<Movie> {
     qualityProfileId,
     rootFolderPath: rootFolder || '/movies',
     monitored: true,
+    minimumAvailability: 'announced',
     addOptions: {
       searchForMovie: true,
+      monitor: 'movieOnly',
     },
   });
 
   const jsonStr: string = await invoke('add_radarr_movie', { url, body });
   return JSON.parse(jsonStr);
+}
+
+export async function triggerRadarrMovieSearch(baseUrl: string, apiKey: string, movieId: number): Promise<void> {
+  const cleanBase = baseUrl.replace(/\/$/, '');
+  const url = `${cleanBase}/api/v3/command?apiKey=${apiKey}`;
+  const body = JSON.stringify({
+    name: 'MoviesSearch',
+    movieIds: [movieId],
+  });
+  await invoke('add_radarr_movie', { url, body });
 }
 
 export async function deleteRadarrMovie(baseUrl: string, apiKey: string, movieId: number): Promise<void> {

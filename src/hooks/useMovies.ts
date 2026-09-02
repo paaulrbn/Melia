@@ -6,6 +6,7 @@ import {
   fetchRadarrMovie,
   fetchQualityProfiles as apiFetchQualityProfiles,
   addRadarrMovie,
+  triggerRadarrMovieSearch,
   deleteRadarrMovie,
   fetchRadarrQueue,
 } from '../services/radarr';
@@ -235,6 +236,14 @@ export function useMovies({
         year: addingMovie.year,
         qualityProfileId: selectedQuality,
       });
+
+      if (createdMovie?.id) {
+        try {
+          await triggerRadarrMovieSearch(radarrUrl, radarrKey, createdMovie.id);
+        } catch (_e) {
+          // ignore if already searching
+        }
+      }
 
       if (autoDownload && createdMovie?.id) {
         if (createdMovie.hasFile && createdMovie.movieFile) {

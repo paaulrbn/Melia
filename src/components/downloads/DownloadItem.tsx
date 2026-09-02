@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { DownloadInfo } from '../../types';
+import { DownloadInfo, Movie } from '../../types';
 import { Play, Pause, Trash2 } from 'lucide-react';
 import { Button, IconButton, ProgressBar } from '../ui';
 import { ConfirmModal } from '../common/ConfirmModal';
 
 interface DownloadItemProps {
   download: DownloadInfo;
+  movie?: Movie;
+  onSelectMovie?: (movie: Movie) => void;
   onPause: (id: number) => void;
   onResume: (id: number) => void;
   onPlay: (path: string) => void;
@@ -14,6 +16,8 @@ interface DownloadItemProps {
 
 export function DownloadItem({
   download,
+  movie,
+  onSelectMovie,
   onPause,
   onResume,
   onPlay,
@@ -25,12 +29,28 @@ export function DownloadItem({
   const isDownloading = download.status === 'downloading';
   const isPaused = download.status === 'paused';
 
+  const handleItemClick = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('.dl-actions')) return;
+    if (movie && onSelectMovie) {
+      onSelectMovie(movie);
+    }
+  };
+
   return (
     <>
-      <div className="download-item">
+      <div
+        className="download-item"
+        style={{ cursor: movie && onSelectMovie ? 'pointer' : 'default' }}
+        onClick={handleItemClick}
+        title={movie && onSelectMovie ? 'Cliquer pour voir les détails' : undefined}
+      >
         <div className="dl-info">
-          <h4>{download.title}</h4>
-          {!isCompleted && (
+          <h4 title={download.title}>{download.title}</h4>
+          {isCompleted ? (
+            <span className="dl-stats dl-stats--completed">
+              <span>{download.stats || 'Sur le disque'}</span>
+            </span>
+          ) : (
             <span className="dl-stats">
               <span>{download.sizeStr || download.stats}</span>
               {isDownloading && download.speed && <span className="dl-separator">•</span>}
@@ -50,6 +70,12 @@ export function DownloadItem({
         </div>
 
         <div className="dl-actions">
+          {!isCompleted && (
+            <span className="dl-percentage dl-percentage--local">
+              {download.progress}%
+            </span>
+          )}
+
           {isDownloading && (
             <IconButton
               icon={<Pause size={16} fill="currentColor" />}

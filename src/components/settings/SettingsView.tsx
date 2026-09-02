@@ -1,5 +1,5 @@
-import { AppInfo, Config } from '../../types';
-import { CONFIG_FIELDS } from '../../utils/constants';
+import { AppInfo, Config, ConfigField } from '../../types';
+import { RADARR_CONFIG_FIELDS, STREAMING_CONFIG_FIELDS } from '../../utils/constants';
 import { Check } from 'lucide-react';
 import { Button, Input } from '../ui';
 
@@ -23,6 +23,20 @@ interface SettingsViewProps {
   onStartEditing: () => void;
   onCancelEditing: () => void;
   onSaveConfig: () => void;
+}
+
+function formatConfigValue(field: ConfigField, value?: string): string {
+  if (!value) return '—';
+  if (field.type === 'password' || field.key === 'MEDIA_SERVER_PASSWORD') {
+    return '••••••••';
+  }
+  if (field.key === 'RADARR_API_KEY') {
+    if (value.length > 8) {
+      return `${value.slice(0, 4)}••••${value.slice(-4)}`;
+    }
+    return '••••••••';
+  }
+  return value;
 }
 
 export function SettingsView({
@@ -59,8 +73,8 @@ export function SettingsView({
         {/* Download folder */}
         <div className="settings-item">
           <div className="settings-item-info">
-            <h4>Dossier de téléchargement</h4>
-            <span className="settings-value" title={currentDownloadDir}>
+            <span className="config-label">Dossier de téléchargement</span>
+            <span className="config-value-highlight" title={currentDownloadDir}>
               {currentDownloadDir}
             </span>
           </div>
@@ -82,9 +96,9 @@ export function SettingsView({
         {/* Version */}
         <div className="settings-item">
           <div className="settings-item-info">
-            <h4>Version</h4>
-            <span className="settings-value">
-              v{appInfo?.version || '0.2.0'} {updateVersion ? `(v${updateVersion} disponible)` : ''}
+            <span className="config-label">Version installée</span>
+            <span className="config-value-highlight">
+              v{appInfo?.version || '0.2.1'} {updateVersion ? `(v${updateVersion} disponible)` : ''}
             </span>
             {updateStatusText && (
               <span className="settings-status-text">{updateStatusText}</span>
@@ -114,32 +128,24 @@ export function SettingsView({
           </div>
         </div>
 
-        {/* Server configuration */}
-        <div className="settings-section-title">
-          <h3>Configuration du serveur</h3>
-        </div>
-
-        <div className="settings-item" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '15px' }}>
-          {isEditingConfig ? (
-            <>
-              <div className="config-grid">
-                {CONFIG_FIELDS.map(field => (
-                  <div key={field.key} className="config-row">
-                    <Input
-                      label={field.label}
-                      type={field.type || 'text'}
-                      inputSize="sm"
-                      fullWidth
-                      placeholder={field.placeholder}
-                      value={editingConfig[field.key] || ''}
-                      onChange={e =>
-                        setEditingConfig(prev => ({ ...prev, [field.key]: e.target.value }))
-                      }
-                    />
-                  </div>
-                ))}
-              </div>
-              <div className="config-actions">
+        {/* Server configuration Header */}
+        <div className="settings-section-header">
+          <div className="settings-section-title">
+            <h3>Configuration du serveur</h3>
+          </div>
+          <div className="settings-section-actions">
+            {configSaved && (
+              <span className="settings-saved-text">
+                <Check size={16} />
+                Enregistré
+              </span>
+            )}
+            {!isEditingConfig ? (
+              <Button variant="secondary" size="sm" onClick={onStartEditing}>
+                Modifier
+              </Button>
+            ) : (
+              <div style={{ display: 'flex', gap: '8px' }}>
                 <Button variant="secondary" size="sm" onClick={onCancelEditing}>
                   Annuler
                 </Button>
@@ -147,33 +153,87 @@ export function SettingsView({
                   Sauvegarder
                 </Button>
               </div>
-            </>
+            )}
+          </div>
+        </div>
+
+        {/* Radarr Sub-group */}
+        <div className="settings-item settings-item--block">
+          <div className="settings-group-header">
+            <h4>Serveur Radarr</h4>
+          </div>
+          {isEditingConfig ? (
+            <div className="config-grid">
+              {RADARR_CONFIG_FIELDS.map(field => (
+                <div key={field.key} className="config-row">
+                  <label htmlFor={`config-input-${field.key}`} className="config-label">
+                    {field.label}
+                  </label>
+                  <Input
+                    id={`config-input-${field.key}`}
+                    type={field.type || 'text'}
+                    inputSize="sm"
+                    fullWidth
+                    placeholder={field.placeholder}
+                    value={editingConfig[field.key] || ''}
+                    onChange={e =>
+                      setEditingConfig(prev => ({ ...prev, [field.key]: e.target.value }))
+                    }
+                  />
+                </div>
+              ))}
+            </div>
           ) : (
-            <>
-              <div className="config-grid">
-                {CONFIG_FIELDS.map(field => (
-                  <div key={field.key} className="config-row">
-                    <div className="config-label">{field.label}</div>
-                    <div className="config-value">
-                      {field.type === 'password' && config[field.key]
-                        ? '••••••••'
-                        : config[field.key] || '—'}
-                    </div>
+            <div className="config-grid">
+              {RADARR_CONFIG_FIELDS.map(field => (
+                <div key={field.key} className="config-row">
+                  <div className="config-label">{field.label}</div>
+                  <div className="config-value" title={config[field.key] || undefined}>
+                    {formatConfigValue(field, config[field.key])}
                   </div>
-                ))}
-              </div>
-              <div className="config-actions">
-                {configSaved && (
-                  <span className="settings-saved-text" style={{ marginRight: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Check size={16} />
-                    Configuration sauvegardée
-                  </span>
-                )}
-                <Button variant="secondary" size="sm" onClick={onStartEditing}>
-                  Modifier
-                </Button>
-              </div>
-            </>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Streaming Sub-group */}
+        <div className="settings-item settings-item--block">
+          <div className="settings-group-header">
+            <h4>Serveur de streaming</h4>
+          </div>
+          {isEditingConfig ? (
+            <div className="config-grid">
+              {STREAMING_CONFIG_FIELDS.map(field => (
+                <div key={field.key} className="config-row">
+                  <label htmlFor={`config-input-${field.key}`} className="config-label">
+                    {field.label}
+                  </label>
+                  <Input
+                    id={`config-input-${field.key}`}
+                    type={field.type || 'text'}
+                    inputSize="sm"
+                    fullWidth
+                    placeholder={field.placeholder}
+                    value={editingConfig[field.key] || ''}
+                    onChange={e =>
+                      setEditingConfig(prev => ({ ...prev, [field.key]: e.target.value }))
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="config-grid">
+              {STREAMING_CONFIG_FIELDS.map(field => (
+                <div key={field.key} className="config-row">
+                  <div className="config-label">{field.label}</div>
+                  <div className="config-value" title={config[field.key] || undefined}>
+                    {formatConfigValue(field, config[field.key])}
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>

@@ -23,3 +23,13 @@ export function formatTime(seconds: number): string {
   if (m > 0) return `${m}m\u00A0${s}s`;
   return `${s}s`;
 }
+
+export function formatDuration(minutes?: number): string {
+  if (!minutes || minutes <= 0) return '';
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h > 0) {
+    return m > 0 ? `${h}\u00A0h\u00A0${m}\u00A0min` : `${h}\u00A0h`;
+  }
+  return `${m}\u00A0min`;
+}

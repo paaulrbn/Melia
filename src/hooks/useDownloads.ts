@@ -206,35 +206,52 @@ export function useDownloads() {
   const syncWithDisk = useCallback(async (moviesList: Movie[], targetDir: string) => {
     if (!moviesList.length || !targetDir) return;
     const updated = await syncMoviesWithDisk(moviesList, targetDir);
-    if (Object.keys(updated).length > 0) {
-      setDownloads(prev => {
-        let hasChange = false;
-        const next = { ...prev };
-        for (const [idStr, newInfo] of Object.entries(updated)) {
-          const id = Number(idStr);
-          const current = prev[id];
-          // NEVER overwrite an ongoing download with disk scan state
-          if (current?.status === 'downloading') {
-            continue;
-          }
-          if (
-            !current ||
-            current.status !== newInfo.status ||
-            current.path !== newInfo.path ||
-            current.progress !== newInfo.progress ||
-            current.stats !== newInfo.stats
-          ) {
-            hasChange = true;
-            next[id] = {
-              ...current,
-              ...newInfo,
-            };
-          }
+
+    setDownloads(prev => {
+      const next: Record<number, DownloadInfo> = {};
+
+      // 1. Keep any currently downloading items
+      for (const [idStr, info] of Object.entries(prev)) {
+        const id = Number(idStr);
+        if (info.status === 'downloading') {
+          next[id] = info;
         }
-        if (!hasChange) return prev;
+      }
+
+      // 2. Add all items found in targetDir
+      for (const [idStr, newInfo] of Object.entries(updated)) {
+        const id = Number(idStr);
+        if (next[id]?.status === 'downloading') {
+          continue;
+        }
+        next[id] = newInfo;
+      }
+
+      // 3. Fast equality check to avoid redundant re-renders
+      const prevKeys = Object.keys(prev);
+      const nextKeys = Object.keys(next);
+      if (prevKeys.length !== nextKeys.length) {
         return next;
-      });
-    }
+      }
+
+      for (const key of nextKeys) {
+        const id = Number(key);
+        const p = prev[id];
+        const n = next[id];
+        if (
+          !p ||
+          p.status !== n.status ||
+          p.path !== n.path ||
+          p.progress !== n.progress ||
+          p.stats !== n.stats ||
+          p.sizeStr !== n.sizeStr
+        ) {
+          return next;
+        }
+      }
+
+      return prev;
+    });
   }, []);
 
   const activeCount = useMemo(() => {

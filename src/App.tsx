@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Movie, TabType } from './types';
 import { useConfig } from './hooks/useConfig';
 import { useDownloads } from './hooks/useDownloads';
@@ -50,6 +50,20 @@ function App() {
     onMoviesFetched: handleMoviesFetched,
     onAutoDownloadReady: handleAutoDownloadReady,
   });
+
+  // Resync downloads with disk whenever download directory or library changes
+  useEffect(() => {
+    const activeDir =
+      downloadsManager.downloadDir || updater.appInfo?.default_download_dir || '';
+    if (activeDir && moviesManager.movies.length > 0) {
+      downloadsManager.syncWithDisk(moviesManager.movies, activeDir);
+    }
+  }, [
+    downloadsManager.downloadDir,
+    moviesManager.movies,
+    updater.appInfo?.default_download_dir,
+    downloadsManager.syncWithDisk,
+  ]);
 
   const searchManager = useSearch(configManager.config);
 

@@ -14,6 +14,7 @@ export interface Movie {
   title: string;
   year: number;
   overview: string;
+  runtime?: number;
   images: MovieImage[];
   hasFile: boolean;
   movieFile?: MovieFile;
@@ -27,6 +28,7 @@ export interface LookupMovie {
   title: string;
   year: number;
   overview: string;
+  runtime?: number;
   images: MovieImage[];
   ratings?: { imdb?: { value: number } };
 }

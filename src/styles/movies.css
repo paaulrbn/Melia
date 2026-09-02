@@ -80,7 +80,7 @@
 .movie-categories {
   display: flex;
   flex-direction: column;
-  gap: 40px;
+  gap: var(--space-xl);
 }
 
 .movie-category {
@@ -89,20 +89,19 @@
 }
 
 .category-title {
-  font-family: var(--font-display);
-  font-size: 1.8rem;
-  letter-spacing: 1.2px;
-  margin: 0 0 20px 0;
-  font-weight: 400;
-  color: var(--text-primary);
-  opacity: 0.9;
-  text-transform: uppercase;
+  font-family: var(--font-heading);
+  font-size: var(--text-lg);
+  letter-spacing: -0.2px;
+  margin: 0 0 var(--space-md) 0;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: none;
 }
 
 .movie-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-  gap: 25px;
+  gap: var(--space-lg);
 }
 
 .movie-card {
