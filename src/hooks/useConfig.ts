@@ -23,8 +23,10 @@ export function useConfig() {
         try {
           const parts = urlStr.split('?data=');
           if (parts.length > 1) {
-            let payloadStr = decodeURIComponent(parts[1]);
-            payloadStr = payloadStr.replace(/[\/\s]+$/, '');
+            let payloadStr = decodeURIComponent(parts[1]).trimEnd();
+            while (payloadStr.endsWith('/')) {
+              payloadStr = payloadStr.slice(0, -1).trimEnd();
+            }
             setConfigPayload(payloadStr);
             setShowConfigPrompt(true);
             setConfigError(null);
@@ -82,7 +84,7 @@ export function useConfig() {
   }, []);
 
   useEffect(() => {
-    loadConfig();
+    void loadConfig();
 
     getCurrent()
       .then(urls => {

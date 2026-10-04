@@ -1,15 +1,17 @@
-import React, { useEffect } from 'react';
+import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { IconButton } from '../ui';
 
 interface ModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  children: React.ReactNode;
-  contentClassName?: string;
-  backdropClassName?: string;
-  contentStyle?: React.CSSProperties;
-  showCloseButton?: boolean;
+  readonly isOpen: boolean;
+  readonly onClose: () => void;
+  readonly children: ReactNode;
+  readonly contentClassName?: string;
+  readonly backdropClassName?: string;
+  readonly contentStyle?: CSSProperties;
+  readonly showCloseButton?: boolean;
+  readonly closeOnEscape?: boolean;
+  readonly closeOnBackdropClick?: boolean;
 }
 
 export function Modal({
@@ -20,12 +22,16 @@ export function Modal({
   backdropClassName = '',
   contentStyle,
   showCloseButton = true,
-}: ModalProps) {
+  closeOnEscape = true,
+  closeOnBackdropClick = true,
+}: Readonly<ModalProps>) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
       const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') onClose();
+        if (closeOnEscape && e.key === 'Escape') onClose();
       };
       window.addEventListener('keydown', handleKeyDown);
       return () => {
@@ -35,12 +41,35 @@ export function Modal({
     } else {
       document.body.style.overflow = '';
     }
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, closeOnEscape]);
+
+  useEffect(() => {
+    if (!isOpen || !closeOnBackdropClick) return;
+
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    const handleBackdropClick = (e: MouseEvent) => {
+      if (e.target === dialog) {
+        onClose();
+      }
+    };
+
+    dialog.addEventListener('click', handleBackdropClick);
+    return () => {
+      dialog.removeEventListener('click', handleBackdropClick);
+    };
+  }, [isOpen, onClose, closeOnBackdropClick]);
 
   if (!isOpen) return null;
 
   return (
-    <div className={`modal-backdrop ${backdropClassName}`.trim()} onClick={onClose}>
+    <dialog
+      ref={dialogRef}
+      open
+      aria-modal="true"
+      className={`modal-backdrop ${backdropClassName}`.trim()}
+    >
       {showCloseButton && (
         <IconButton
           icon={<X size={20} />}
@@ -54,10 +83,9 @@ export function Modal({
       <div
         className={contentClassName}
         style={contentStyle}
-        onClick={e => e.stopPropagation()}
       >
         {children}
       </div>
-    </div>
+    </dialog>
   );
 }

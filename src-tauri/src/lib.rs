@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 mod commands;
 use commands::*;
@@ -18,7 +18,7 @@ pub fn run() {
         })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .manage(DownloadState(Mutex::new(HashMap::new())))
+        .manage(DownloadState(Arc::new(Mutex::new(HashMap::new()))))
         .invoke_handler(tauri::generate_handler![
             play_video,
             download_video,
@@ -28,7 +28,16 @@ pub fn run() {
             get_radarr_quality_profiles,
             add_radarr_movie,
             delete_radarr_movie,
+            fetch_sonarr_series,
+            search_sonarr_series,
+            get_sonarr_quality_profiles,
+            get_sonarr_root_folders,
+            get_sonarr_episodes,
+            get_sonarr_episode_files,
+            add_sonarr_series,
+            delete_sonarr_series,
             cancel_download,
+            get_download_path,
             check_update,
             install_update,
             get_app_info,
@@ -36,7 +45,8 @@ pub fn run() {
             open_folder,
             check_file_exists,
             delete_file,
-            get_file_size
+            get_file_size,
+            scan_local_episodes
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

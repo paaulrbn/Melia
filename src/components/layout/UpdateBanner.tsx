@@ -2,10 +2,10 @@ import { X } from 'lucide-react';
 import { IconButton } from '../ui';
 
 interface UpdateBannerProps {
-  updateVersion: string | null;
-  isInstalling: boolean;
-  onInstall: () => void;
-  onDismiss: () => void;
+  readonly updateVersion: string | null;
+  readonly isInstalling: boolean;
+  readonly onInstall: () => void;
+  readonly onDismiss: () => void;
 }
 
 export function UpdateBanner({
@@ -13,7 +13,7 @@ export function UpdateBanner({
   isInstalling,
   onInstall,
   onDismiss,
-}: UpdateBannerProps) {
+}: Readonly<UpdateBannerProps>) {
   if (!updateVersion) return null;
 
   return (

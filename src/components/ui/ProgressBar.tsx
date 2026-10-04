@@ -16,8 +16,19 @@ export function ProgressBar({
   size = 'md',
   className = '',
   ...props
-}: ProgressBarProps) {
+}: Readonly<ProgressBarProps>) {
   const clampedValue = Math.min(100, Math.max(0, value));
+
+  let minWidth: string | number = 0;
+  if (clampedValue > 0) {
+    if (size === 'xs') {
+      minWidth = '3px';
+    } else if (size === 'sm') {
+      minWidth = '4px';
+    } else {
+      minWidth = '6px';
+    }
+  }
 
   const containerClasses = [
     'ui-progress-container',
@@ -39,15 +50,18 @@ export function ProgressBar({
   return (
     <div
       className={containerClasses}
-      role="progressbar"
-      aria-valuenow={indeterminate ? undefined : clampedValue}
-      aria-valuemin={0}
-      aria-valuemax={100}
       {...props}
     >
       <div
         className={barClasses}
-        style={indeterminate ? undefined : { width: `${clampedValue}%` }}
+        style={
+          indeterminate
+            ? undefined
+            : {
+                width: `${clampedValue}%`,
+                minWidth,
+              }
+        }
       />
     </div>
   );

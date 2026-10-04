@@ -14,13 +14,14 @@ export function useUpdater() {
       const info = await getAppInfo();
       setAppInfo(info);
       return info;
-    } catch (_e) {
+    } catch {
+      // Failed to load app info from backend; return null
       return null;
     }
   }, []);
 
   useEffect(() => {
-    loadAppInfo();
+    void loadAppInfo();
 
     const updateTimer = setTimeout(async () => {
       try {
@@ -28,8 +29,8 @@ export function useUpdater() {
         if (res.available && res.latest_version) {
           setUpdateVersion(res.latest_version);
         }
-      } catch (_e) {
-        // ignore
+      } catch {
+        // Automatic update check failed silently; ignore
       }
     }, 3000);
 

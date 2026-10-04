@@ -1,69 +1,6 @@
 /* ==========================================================================
    Downloads View & Active Progress
    ========================================================================== */
-.download-active-section {
-  margin-top: 20px;
-  background: rgba(255, 255, 255, 0.02);
-  padding: 20px;
-  border-radius: 28px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.progress-header {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 12px;
-  font-weight: 500;
-  font-size: 1rem;
-  color: var(--text-primary);
-}
-
-.download-stats {
-  color: var(--accent-primary);
-  font-family: var(--font-body);
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-}
-
-.download-stats--server {
-  color: var(--accent-server);
-}
-
-.progress-container {
-  width: 100%;
-  height: 6px;
-  background-color: rgba(255, 255, 255, 0.08);
-  border-radius: 999px;
-  margin-bottom: 0;
-  overflow: hidden;
-}
-
-.progress-bar {
-  height: 100%;
-  background-color: var(--accent-primary);
-  box-shadow: 0 0 15px var(--accent-glow);
-  transition: width 0.3s ease;
-  position: relative;
-  overflow: hidden;
-}
-
-.progress-bar::after {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; bottom: 0; right: 0;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-  animation: shimmer 1.5s infinite;
-}
-
-.progress-bar.paused {
-  background-color: #444;
-  box-shadow: none;
-}
-
-.progress-bar.paused::after {
-  display: none;
-  animation: none;
-}
 
 .downloads-view {
   max-width: 900px;
@@ -76,7 +13,7 @@
 
 .downloads-section-title {
   color: var(--text-secondary);
-  font-family: var(--font-heading);
+  font-family: var(--font-heading), sans-serif;
   font-size: var(--text-md);
   font-weight: 500;
   letter-spacing: -0.2px;
@@ -94,29 +31,82 @@
 
 .download-item {
   background: rgba(255, 255, 255, 0.02);
-  padding: 16px 20px;
+  padding: 6px;
   border-radius: 14px;
   display: flex;
   align-items: center;
-  gap: var(--space-lg);
+  gap: var(--space-md);
   border: 1px solid rgba(255, 255, 255, 0.04);
   transition: var(--transition-smooth);
 }
 
-.download-item:hover {
+.download-item.is-clickable:hover {
   background: rgba(255, 255, 255, 0.04);
   border-color: rgba(255, 255, 255, 0.08);
 }
 
-.dl-info {
-  flex: 0 0 auto;
-  min-width: 250px;
-  max-width: 320px;
+.dl-poster-btn,
+.dl-title-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  display: block;
 }
 
-.dl-info h4 {
-  margin: 0 0 var(--space-micro) 0;
-  font-family: var(--font-body);
+.dl-title-btn {
+  flex: 1;
+  min-width: 0;
+}
+
+.dl-title-btn:hover h4 {
+  color: var(--accent-primary, #ffffff);
+}
+
+.dl-poster {
+  width: auto;
+  height: 80px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.dl-poster--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-tertiary);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.dl-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  justify-content: center;
+}
+
+.dl-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+.dl-header-row h4 {
+  margin: 0;
+  font-family: var(--font-body), sans-serif;
   font-size: var(--text-base);
   font-weight: 600;
   color: var(--text-primary);
@@ -124,6 +114,23 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1;
+}
+
+.dl-subtitle {
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.dl-progress-row {
+  width: 100%;
+}
+
+.dl-meta-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
 }
 
 .dl-stats {
@@ -156,12 +163,9 @@
   display: inline-block;
 }
 
-.dl-center {
-  flex: 1;
-  margin-top: 0;
-  display: flex;
-  align-items: center;
-  min-width: 100px;
+.dl-paused-label {
+  color: var(--text-secondary);
+  font-weight: 500;
 }
 
 .dl-actions {
@@ -175,6 +179,9 @@
   font-size: var(--text-sm);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  min-width: 38px;
+  text-align: right;
+  margin-right: 2px;
 }
 
 .dl-percentage--server {
@@ -183,4 +190,179 @@
 
 .dl-percentage--local {
   color: var(--accent-primary);
+}
+
+/* ==========================================================================
+   Series Group in Downloads
+   ========================================================================== */
+.download-series-group {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 14px;
+  overflow: hidden;
+  transition: var(--transition-smooth);
+}
+
+.download-series-group:hover {
+  border-color: rgba(255, 255, 255, 0.07);
+}
+
+.download-series-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  transition: var(--transition-smooth);
+}
+
+button.download-series-group-header {
+  width: 100%;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.download-series-group-header.is-clickable {
+  cursor: pointer;
+}
+
+.download-series-group-header.is-clickable:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.download-series-group-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.download-series-group-poster {
+  width: 28px;
+  height: 40px;
+  border-radius: 5px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.download-series-group-icon {
+  color: var(--accent-primary);
+  opacity: 0.8;
+  flex-shrink: 0;
+}
+
+.download-series-group-title {
+  margin: 0;
+  font-family: var(--font-body), sans-serif;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.2px;
+}
+
+.download-series-group-count {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.download-series-episodes {
+  display: flex;
+  flex-direction: column;
+}
+
+.download-series-ep-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: 12px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.025);
+}
+
+.download-series-ep-row:last-child {
+  border-bottom: none;
+}
+
+.dl-ep-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  justify-content: center;
+}
+
+.dl-ep-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+.dl-ep-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.dl-ep-title {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.2px;
+  line-height: 1.25;
+}
+
+.dl-ep-sub {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+.dl-ep-progress-row {
+  width: 100%;
+}
+
+.dl-ep-meta-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.dl-ep-stats {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+}
+
+.dl-ep-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-shrink: 0;
 }

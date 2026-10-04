@@ -7,23 +7,88 @@ use tauri::{AppHandle, Emitter};
 use tokio::io::AsyncWriteExt;
 use url::Url;
 
-pub struct DownloadState(pub Mutex<HashMap<u32, Arc<AtomicBool>>>);
+use std::path::PathBuf;
+
+#[derive(Clone)]
+pub struct ActiveDownload {
+    pub cancel_flag: Arc<AtomicBool>,
+    pub delete_on_cancel: Arc<AtomicBool>,
+    pub file_path: PathBuf,
+}
+
+pub struct DownloadState(pub Arc<Mutex<HashMap<String, ActiveDownload>>>);
+
+pub struct DownloadGuard {
+    state: Arc<Mutex<HashMap<String, ActiveDownload>>>,
+    id: String,
+}
+
+impl Drop for DownloadGuard {
+    fn drop(&mut self) {
+        if let Ok(mut map) = self.state.lock() {
+            map.remove(&self.id);
+        }
+    }
+}
 
 #[derive(Clone, serde::Serialize)]
 pub struct ProgressPayload {
-    pub id: u32,
+    pub id: String,
     pub downloaded: u64,
     pub total: Option<u64>,
     pub speed: Option<u64>,
 }
 
-#[tauri::command]
-pub fn cancel_download(state: tauri::State<DownloadState>, id: u32) {
-    if let Ok(map) = state.0.lock() {
-        if let Some(flag) = map.get(&id) {
-            flag.store(true, Ordering::SeqCst);
+pub fn resolve_download_path(filename: &str, custom_dir: Option<&str>) -> PathBuf {
+    let melia_dir = if let Some(dir) = custom_dir {
+        if !dir.trim().is_empty() {
+            PathBuf::from(dir)
+        } else {
+            dirs::download_dir()
+                .unwrap_or_else(std::env::temp_dir)
+                .join("Melia")
+        }
+    } else {
+        dirs::download_dir()
+            .unwrap_or_else(std::env::temp_dir)
+            .join("Melia")
+    };
+
+    let mut file_path = melia_dir;
+    let normalized = filename.replace('\\', "/");
+    for part in normalized.split('/') {
+        let trimmed = part.trim();
+        if !trimmed.is_empty() && trimmed != "." && trimmed != ".." {
+            let safe_part = trimmed.replace(':', " -");
+            file_path.push(safe_part);
         }
     }
+    file_path
+}
+
+#[tauri::command]
+pub fn get_download_path(filename: String, custom_dir: Option<String>) -> Result<String, String> {
+    let path = resolve_download_path(&filename, custom_dir.as_deref());
+    Ok(path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub fn cancel_download(
+    state: tauri::State<DownloadState>,
+    id: String,
+    delete_file: Option<bool>,
+) -> Option<String> {
+    let should_delete = delete_file.unwrap_or(false);
+    if let Ok(map) = state.0.lock() {
+        if let Some(active) = map.get(&id) {
+            if should_delete {
+                active.delete_on_cancel.store(true, Ordering::SeqCst);
+            }
+            active.cancel_flag.store(true, Ordering::SeqCst);
+            return Some(active.file_path.to_string_lossy().to_string());
+        }
+    }
+    None
 }
 
 #[tauri::command]
@@ -32,13 +97,30 @@ pub async fn download_video(
     state: tauri::State<'_, DownloadState>,
     url: String,
     filename: String,
-    id: u32,
+    id: String,
     custom_dir: Option<String>,
 ) -> Result<String, String> {
-    let cancel_flag = Arc::new(AtomicBool::new(false));
-    if let Ok(mut map) = state.0.lock() {
-        map.insert(id, cancel_flag.clone());
+    let file_path = resolve_download_path(&filename, custom_dir.as_deref());
+    if let Some(parent) = file_path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
+
+    let cancel_flag = Arc::new(AtomicBool::new(false));
+    let delete_on_cancel = Arc::new(AtomicBool::new(false));
+    if let Ok(mut map) = state.0.lock() {
+        map.insert(
+            id.clone(),
+            ActiveDownload {
+                cancel_flag: cancel_flag.clone(),
+                delete_on_cancel: delete_on_cancel.clone(),
+                file_path: file_path.clone(),
+            },
+        );
+    }
+    let _guard = DownloadGuard {
+        state: state.0.clone(),
+        id: id.clone(),
+    };
 
     let mut target_url = url.clone();
     let mut auth_header = None;
@@ -63,24 +145,6 @@ pub async fn download_video(
             target_url = parsed_url.to_string();
         }
     }
-
-    let melia_dir = if let Some(dir) = custom_dir {
-        if !dir.trim().is_empty() {
-            std::path::PathBuf::from(dir)
-        } else {
-            dirs::download_dir()
-                .unwrap_or_else(std::env::temp_dir)
-                .join("Melia")
-        }
-    } else {
-        dirs::download_dir()
-            .unwrap_or_else(std::env::temp_dir)
-            .join("Melia")
-    };
-    std::fs::create_dir_all(&melia_dir).map_err(|e| e.to_string())?;
-
-    let safe_filename = filename.replace('/', "_").replace('\\', "_");
-    let file_path = melia_dir.join(safe_filename);
 
     let mut downloaded: u64 = 0;
     if file_path.exists() {
@@ -110,7 +174,7 @@ pub async fn download_video(
         let _ = app.emit(
             "download_progress",
             ProgressPayload {
-                id,
+                id: id.clone(),
                 downloaded,
                 total: Some(downloaded),
                 speed: None,
@@ -154,18 +218,30 @@ pub async fn download_video(
 
     while let Some(chunk) = response.chunk().await.map_err(|e| e.to_string())? {
         if cancel_flag.load(Ordering::SeqCst) {
-            let _ = writer.flush().await;
+            let should_delete = delete_on_cancel.load(Ordering::SeqCst);
+            let path_to_remove = file_path.clone();
+            if !should_delete {
+                let _ = writer.flush().await;
+            }
+            drop(writer);
             if let Ok(mut map) = state.0.lock() {
                 map.remove(&id);
             }
-            return Err("Téléchargement mis en pause".to_string());
+            if should_delete && path_to_remove.exists() {
+                let _ = tokio::fs::remove_file(&path_to_remove).await;
+            }
+            return Err(if should_delete {
+                "Téléchargement annulé".to_string()
+            } else {
+                "Téléchargement mis en pause".to_string()
+            });
         }
 
         writer.write_all(&chunk).await.map_err(|e| e.to_string())?;
         downloaded += chunk.len() as u64;
 
         let speed_elapsed_ms = last_speed_calc_time.elapsed().as_millis();
-        if speed_elapsed_ms >= 500 {
+        if speed_elapsed_ms >= 1000 {
             let bytes_diff = downloaded.saturating_sub(last_speed_downloaded);
             let speed_bps = (bytes_diff as f64 / (speed_elapsed_ms as f64 / 1000.0)) as u64;
             current_speed = Some(speed_bps);
@@ -173,11 +249,11 @@ pub async fn download_video(
             last_speed_downloaded = downloaded;
         }
 
-        if last_emit_time.elapsed().as_millis() > 200 {
+        if last_emit_time.elapsed().as_millis() >= 1000 {
             let _ = app.emit(
                 "download_progress",
                 ProgressPayload {
-                    id,
+                    id: id.clone(),
                     downloaded,
                     total: total_size,
                     speed: current_speed,
@@ -192,7 +268,7 @@ pub async fn download_video(
     let _ = app.emit(
         "download_progress",
         ProgressPayload {
-            id,
+            id: id.clone(),
             downloaded,
             total: total_size,
             speed: None,

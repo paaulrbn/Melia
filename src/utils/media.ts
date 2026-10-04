@@ -1,16 +1,17 @@
 import { Config, MovieImage } from '../types';
 
 export function getImageUrl(
-  movie: { images: MovieImage[] },
-  type: 'poster' | 'fanart' | string
-): string {
+  movie: { images?: MovieImage[] } | null | undefined,
+  type: string
+): string | null {
+  if (!Array.isArray(movie?.images)) return null;
   const img = movie.images.find(i => i.coverType === type);
-  if (!img) return '';
+  if (!img?.remoteUrl) return null;
   let url = img.remoteUrl;
   if (type === 'poster' && url.includes('poster.jpg')) {
     url = url.replace('poster.jpg', 'poster-250.jpg');
   }
-  return url;
+  return url || null;
 }
 
 export function getStreamUrl(filePath: string, config: Config): string {

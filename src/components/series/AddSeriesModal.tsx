@@ -1,23 +1,22 @@
-import { useState } from 'react';
-import { LookupMovie, QualityProfile } from '../../types';
+import { LookupSeries, QualityProfile } from '../../types';
 import { getImageUrl } from '../../utils/media';
 import { Modal } from '../common/Modal';
 import { Plus } from 'lucide-react';
-import { Button, Select, Checkbox, ProgressBar } from '../ui';
+import { Button, Select, ProgressBar } from '../ui';
 
-interface AddMovieModalProps {
-  readonly movie: LookupMovie | null;
+interface AddSeriesModalProps {
+  readonly series: LookupSeries | null;
   readonly qualityProfiles: QualityProfile[];
   readonly selectedQuality: number | null;
   readonly setSelectedQuality: (id: number) => void;
   readonly isAdding: boolean;
   readonly error: string | null;
-  readonly onAdd: (autoDownload: boolean) => void;
+  readonly onAdd: () => void;
   readonly onClose: () => void;
 }
 
-export function AddMovieModal({
-  movie,
+export function AddSeriesModal({
+  series,
   qualityProfiles,
   selectedQuality,
   setSelectedQuality,
@@ -25,20 +24,13 @@ export function AddMovieModal({
   error,
   onAdd,
   onClose,
-}: Readonly<AddMovieModalProps>) {
-  const [autoDownload, setAutoDownload] = useState(false);
+}: Readonly<AddSeriesModalProps>) {
+  if (!series) return null;
 
-  if (!movie) return null;
-
-  const fanartUrl = getImageUrl(movie, 'fanart');
-
-  const handleClose = () => {
-    setAutoDownload(false);
-    onClose();
-  };
+  const fanartUrl = getImageUrl(series, 'fanart');
 
   return (
-    <Modal isOpen={!!movie} onClose={handleClose}>
+    <Modal isOpen={!!series} onClose={onClose}>
       <div
         className="modal-header"
         style={{ backgroundImage: fanartUrl ? `url(${fanartUrl})` : undefined }}
@@ -46,14 +38,14 @@ export function AddMovieModal({
         <div className="modal-header-gradient">
           <div className="modal-title-area">
             <h2>
-              {movie.title} <span className="modal-year">({movie.year})</span>
+              {series.title} <span className="modal-year">({series.year})</span>
             </h2>
           </div>
         </div>
       </div>
 
       <div className="modal-body">
-        <p className="overview">{movie.overview || 'Aucun résumé disponible.'}</p>
+        <p className="overview">{series.overview || 'Aucun résumé disponible.'}</p>
 
         {error && <p className="add-movie-error">{error}</p>}
 
@@ -61,7 +53,7 @@ export function AddMovieModal({
           <div className="add-movie-progress">
             <ProgressBar indeterminate size="md" />
             <p className="add-movie-progress-text">
-              Ajout en cours… Recherche du film sur le serveur.
+              Ajout de la série sur le serveur…
             </p>
           </div>
         ) : (
@@ -79,12 +71,6 @@ export function AddMovieModal({
                   style={{ minWidth: '200px' }}
                 />
               </div>
-
-              <Checkbox
-                checked={autoDownload}
-                onChange={e => setAutoDownload(e.target.checked)}
-                label="Télécharger en local dès que disponible sur le serveur"
-              />
             </div>
 
             <div className="add-movie-actions">
@@ -92,7 +78,7 @@ export function AddMovieModal({
                 variant="primary"
                 size="lg"
                 leftIcon={<Plus size={20} />}
-                onClick={() => onAdd(autoDownload)}
+                onClick={onAdd}
                 disabled={!selectedQuality}
               >
                 Ajouter au serveur

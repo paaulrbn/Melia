@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { LookupMovie, Movie, QualityProfile, QueueRecord } from '../types';
+import { normalizeRootFolder } from '../utils/formatters';
 
 export async function fetchRadarrMovies(baseUrl: string, apiKey: string): Promise<Movie[]> {
   const cleanBase = baseUrl.replace(/\/$/, '');
@@ -42,6 +43,8 @@ export interface AddMovieParams {
 
 export async function addRadarrMovie(params: AddMovieParams): Promise<Movie> {
   const { baseUrl, apiKey, rootFolder, tmdbId, title, year, qualityProfileId } = params;
+  const cleanRoot = normalizeRootFolder(rootFolder, '/movies');
+
   const cleanBase = baseUrl.replace(/\/$/, '');
   const url = `${cleanBase}/api/v3/movie?apiKey=${apiKey}`;
   const body = JSON.stringify({
@@ -49,7 +52,7 @@ export async function addRadarrMovie(params: AddMovieParams): Promise<Movie> {
     title,
     year,
     qualityProfileId,
-    rootFolderPath: rootFolder || '/movies',
+    rootFolderPath: cleanRoot,
     monitored: true,
     minimumAvailability: 'announced',
     addOptions: {
@@ -75,6 +78,12 @@ export async function triggerRadarrMovieSearch(baseUrl: string, apiKey: string, 
 export async function deleteRadarrMovie(baseUrl: string, apiKey: string, movieId: number): Promise<void> {
   const cleanBase = baseUrl.replace(/\/$/, '');
   const url = `${cleanBase}/api/v3/movie/${movieId}?deleteFiles=true&apiKey=${apiKey}`;
+  await invoke('delete_radarr_movie', { url });
+}
+
+export async function deleteRadarrQueueItem(baseUrl: string, apiKey: string, queueId: number): Promise<void> {
+  const cleanBase = baseUrl.replace(/\/$/, '');
+  const url = `${cleanBase}/api/v3/queue/${queueId}?removeFromClient=true&blocklist=false&apiKey=${apiKey}`;
   await invoke('delete_radarr_movie', { url });
 }
 

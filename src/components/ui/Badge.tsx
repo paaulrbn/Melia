@@ -12,7 +12,7 @@ export function Badge({
   children,
   className = '',
   ...props
-}: BadgeProps) {
+}: Readonly<BadgeProps>) {
   const classNames = [
     'ui-badge',
     `ui-badge--${variant}`,

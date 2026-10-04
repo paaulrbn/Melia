@@ -8,7 +8,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  font-family: var(--font-body);
+  font-family: var(--font-body), sans-serif;
   font-weight: 600;
   border-radius: 8px;
   border: 1px solid transparent;
@@ -52,7 +52,7 @@
   height: 48px;
   padding: 0 26px;
   font-size: 0.98rem;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.02em;
   border-radius: 10px;
 }
 
@@ -75,7 +75,7 @@
 }
 
 .ui-btn--secondary:hover:not(:disabled) {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: #2c2c30;
   color: #ffffff;
   border-color: rgba(255, 255, 255, 0.25);
 }
@@ -87,12 +87,12 @@
 }
 
 .ui-btn--ghost:hover:not(:disabled) {
-  background-color: rgba(255, 255, 255, 0.06);
+  background-color: #242428;
   color: #ffffff;
 }
 
 .ui-btn--danger {
-  background-color: rgba(229, 9, 20, 0.12);
+  background-color: #2c1214;
   color: #ff6b6b;
   border-color: rgba(229, 9, 20, 0.25);
 }
@@ -180,7 +180,7 @@
 
 .ui-icon-btn--default:hover:not(:disabled),
 .ui-icon-btn--secondary:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
+  background: #2c2c30;
   color: #ffffff;
   border-color: rgba(255, 255, 255, 0.25);
 }
@@ -202,20 +202,21 @@
 }
 
 .ui-icon-btn--ghost:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.08);
+  background: #242428;
   color: #ffffff;
 }
 
 .ui-icon-btn--danger {
-  background: rgba(229, 9, 20, 0.12);
-  color: #ff6b6b;
-  border-color: rgba(229, 9, 20, 0.25);
+  background: transparent;
+  color: var(--text-secondary);
+  border-color: transparent;
+  opacity: 1;
 }
 
 .ui-icon-btn--danger:hover:not(:disabled) {
-  background: rgba(229, 9, 20, 0.22);
-  color: #ffffff;
-  border-color: rgba(229, 9, 20, 0.45);
+  background: #361518;
+  color: #ff6b6b;
+  border-color: rgba(229, 9, 20, 0.25);
 }
 
 .ui-icon-btn:disabled {
@@ -289,7 +290,7 @@
   border: none;
   outline: none;
   color: var(--text-primary);
-  font-family: var(--font-body);
+  font-family: var(--font-body), sans-serif;
   font-weight: 500;
   box-sizing: border-box;
   margin: 0;
@@ -385,7 +386,7 @@
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
   color: var(--text-primary);
-  font-family: var(--font-body);
+  font-family: var(--font-body), sans-serif;
   outline: none;
   cursor: pointer;
   transition: var(--transition-smooth);
@@ -521,7 +522,7 @@
 
 /* Badge (.ui-badge) */
 .ui-badge {
-  font-family: var(--font-body);
+  font-family: var(--font-body), sans-serif;
   font-size: 0.72rem;
   font-weight: 700;
   display: inline-flex;
@@ -619,9 +620,28 @@
 .ui-progress-bar--server:not(.ui-progress-bar--paused)::after {
   content: '';
   position: absolute;
-  top: 0; left: 0; bottom: 0; right: 0;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-  animation: shimmer 1.5s infinite;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.22) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 160px 100%;
+  animation: progressGlow 2s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes progressGlow {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 160px 0;
+  }
 }
 
 .ui-progress-bar--paused {
@@ -633,4 +653,13 @@
   width: 100% !important;
   animation: indeterminate 1.5s infinite linear;
   background: linear-gradient(90deg, transparent, var(--accent-primary), transparent);
+}
+
+@keyframes indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
 }

@@ -2,12 +2,12 @@ import { Modal } from '../common/Modal';
 import { Button, Input } from '../ui';
 
 interface ConfigImportModalProps {
-  isOpen: boolean;
-  password: string;
-  onPasswordChange: (pwd: string) => void;
-  error: string | null;
-  onDecrypt: () => void;
-  onClose: () => void;
+  readonly isOpen: boolean;
+  readonly password: string;
+  readonly onPasswordChange: (pwd: string) => void;
+  readonly error: string | null;
+  readonly onDecrypt: () => void;
+  readonly onClose: () => void;
 }
 
 export function ConfigImportModal({
@@ -17,7 +17,7 @@ export function ConfigImportModal({
   error,
   onDecrypt,
   onClose,
-}: ConfigImportModalProps) {
+}: Readonly<ConfigImportModalProps>) {
   if (!isOpen) return null;
 
   return (

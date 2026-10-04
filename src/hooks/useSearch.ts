@@ -1,60 +1,137 @@
 import { useState, useRef, useCallback } from 'react';
-import { Config, LookupMovie } from '../types';
+import { Config, LookupMovie, LookupSeries } from '../types';
 import { searchRadarrMovies } from '../services/radarr';
+import { searchSonarrSeries } from '../services/sonarr';
 
 export function useSearch(config: Config) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<LookupMovie[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Movie search
+  const [movieSearchQuery, setMovieSearchQuery] = useState('');
+  const [movieSearchResults, setMovieSearchResults] = useState<LookupMovie[]>([]);
+  const [isMovieSearching, setIsMovieSearching] = useState(false);
+  const movieTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const movieRequestIdRef = useRef(0);
 
-  const handleSearch = useCallback(
+  // Series search
+  const [seriesSearchQuery, setSeriesSearchQuery] = useState('');
+  const [seriesSearchResults, setSeriesSearchResults] = useState<LookupSeries[]>([]);
+  const [isSeriesSearching, setIsSeriesSearching] = useState(false);
+  const seriesTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const seriesRequestIdRef = useRef(0);
+
+  const handleMovieSearch = useCallback(
     (term: string) => {
-      setSearchQuery(term);
-
-      if (searchTimer.current) {
-        clearTimeout(searchTimer.current);
-      }
+      setMovieSearchQuery(term);
+      if (movieTimer.current) clearTimeout(movieTimer.current);
+      const requestId = ++movieRequestIdRef.current;
 
       if (!term.trim()) {
-        setSearchResults([]);
-        setIsSearching(false);
+        setMovieSearchResults([]);
+        setIsMovieSearching(false);
         return;
       }
 
-      setIsSearching(true);
-      searchTimer.current = setTimeout(async () => {
+      setIsMovieSearching(true);
+      movieTimer.current = setTimeout(async () => {
         const baseUrl = config['RADARR_BASE_URL'];
         const apiKey = config['RADARR_API_KEY'];
         if (!baseUrl || !apiKey) {
-          setIsSearching(false);
+          if (requestId === movieRequestIdRef.current) {
+            setIsMovieSearching(false);
+          }
           return;
         }
 
         try {
           const data = await searchRadarrMovies(baseUrl, apiKey, term);
-          setSearchResults(data);
-        } catch (_e) {
-          setSearchResults([]);
+          if (requestId === movieRequestIdRef.current) {
+            setMovieSearchResults(data);
+          }
+        } catch {
+          // Ignore search error gracefully to reset results
+          if (requestId === movieRequestIdRef.current) {
+            setMovieSearchResults([]);
+          }
         } finally {
-          setIsSearching(false);
+          if (requestId === movieRequestIdRef.current) {
+            setIsMovieSearching(false);
+          }
         }
-      }, 400);
+      }, 350);
     },
     [config]
   );
 
-  const clearSearch = useCallback(() => {
-    setSearchQuery('');
-    setSearchResults([]);
-    setIsSearching(false);
+  const clearMovieSearch = useCallback(() => {
+    movieRequestIdRef.current++;
+    if (movieTimer.current) clearTimeout(movieTimer.current);
+    setMovieSearchQuery('');
+    setMovieSearchResults([]);
+    setIsMovieSearching(false);
+  }, []);
+
+  const handleSeriesSearch = useCallback(
+    (term: string) => {
+      setSeriesSearchQuery(term);
+      if (seriesTimer.current) clearTimeout(seriesTimer.current);
+      const requestId = ++seriesRequestIdRef.current;
+
+      if (!term.trim()) {
+        setSeriesSearchResults([]);
+        setIsSeriesSearching(false);
+        return;
+      }
+
+      setIsSeriesSearching(true);
+      seriesTimer.current = setTimeout(async () => {
+        const baseUrl = config['SONARR_BASE_URL'];
+        const apiKey = config['SONARR_API_KEY'];
+        if (!baseUrl || !apiKey) {
+          if (requestId === seriesRequestIdRef.current) {
+            setIsSeriesSearching(false);
+          }
+          return;
+        }
+
+        try {
+          const data = await searchSonarrSeries(baseUrl, apiKey, term);
+          if (requestId === seriesRequestIdRef.current) {
+            setSeriesSearchResults(data);
+          }
+        } catch {
+          // Ignore search error gracefully to reset results
+          if (requestId === seriesRequestIdRef.current) {
+            setSeriesSearchResults([]);
+          }
+        } finally {
+          if (requestId === seriesRequestIdRef.current) {
+            setIsSeriesSearching(false);
+          }
+        }
+      }, 350);
+    },
+    [config]
+  );
+
+  const clearSeriesSearch = useCallback(() => {
+    seriesRequestIdRef.current++;
+    if (seriesTimer.current) clearTimeout(seriesTimer.current);
+    setSeriesSearchQuery('');
+    setSeriesSearchResults([]);
+    setIsSeriesSearching(false);
   }, []);
 
   return {
-    searchQuery,
-    searchResults,
-    isSearching,
-    handleSearch,
-    clearSearch,
+    // Movies
+    searchQuery: movieSearchQuery,
+    searchResults: movieSearchResults,
+    isSearching: isMovieSearching,
+    handleSearch: handleMovieSearch,
+    clearSearch: clearMovieSearch,
+    // Series
+    seriesSearchQuery,
+    seriesSearchResults,
+    isSeriesSearching,
+    handleSeriesSearch,
+    clearSeriesSearch,
   };
 }

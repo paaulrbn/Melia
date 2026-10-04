@@ -33,7 +33,7 @@
 }
 
 .update-text {
-  font-family: var(--font-body);
+  font-family: var(--font-body), sans-serif;
   font-size: 0.82rem;
   font-weight: 400;
   color: rgba(255, 255, 255, 0.7);
@@ -45,7 +45,7 @@
   border: none;
   border-radius: 999px;
   padding: 6px 14px;
-  font-family: var(--font-body);
+  font-family: var(--font-body), sans-serif;
   font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;

@@ -37,6 +37,13 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       .filter(Boolean)
       .join(' ');
 
+    let spinnerSize = 18;
+    if (size === 'sm') {
+      spinnerSize = 16;
+    } else if (size === 'lg') {
+      spinnerSize = 20;
+    }
+
     return (
       <button
         ref={ref}
@@ -46,7 +53,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         {...props}
       >
         {isLoading ? (
-          <Loader2 className="ui-btn-spinner" size={size === 'sm' ? 16 : size === 'lg' ? 20 : 18} />
+          <Loader2 className="ui-btn-spinner" size={spinnerSize} />
         ) : (
           leftIcon && <span className="ui-btn-icon ui-btn-icon--left">{leftIcon}</span>
         )}

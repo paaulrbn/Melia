@@ -4,16 +4,16 @@ import { Button } from '../ui';
 import { AlertTriangle, Trash2 } from 'lucide-react';
 
 export interface ConfirmModalProps {
-  isOpen: boolean;
-  title: string;
-  message: React.ReactNode;
-  confirmLabel?: string;
-  cancelLabel?: string;
-  variant?: 'danger' | 'primary';
-  icon?: React.ReactNode;
-  isLoading?: boolean;
-  onConfirm: () => void;
-  onClose: () => void;
+  readonly isOpen: boolean;
+  readonly title: string;
+  readonly message: React.ReactNode;
+  readonly confirmLabel?: string;
+  readonly cancelLabel?: string;
+  readonly variant?: 'danger' | 'primary';
+  readonly icon?: React.ReactNode;
+  readonly isLoading?: boolean;
+  readonly onConfirm: () => void;
+  readonly onClose: () => void;
 }
 
 export function ConfirmModal({
@@ -27,7 +27,7 @@ export function ConfirmModal({
   isLoading = false,
   onConfirm,
   onClose,
-}: ConfirmModalProps) {
+}: Readonly<ConfirmModalProps>) {
   if (!isOpen) return null;
 
   return (

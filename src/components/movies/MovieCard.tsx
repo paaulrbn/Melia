@@ -4,11 +4,11 @@ import { Play, Plus } from 'lucide-react';
 import { ProgressBar } from '../ui';
 
 interface MovieCardProps {
-  movie: Movie | LookupMovie;
-  download?: DownloadInfo;
-  queueItem?: QueueRecord;
-  isAddHint?: boolean;
-  onClick: () => void;
+  readonly movie: Movie | LookupMovie;
+  readonly download?: DownloadInfo;
+  readonly queueItem?: QueueRecord;
+  readonly isAddHint?: boolean;
+  readonly onClick: () => void;
 }
 
 export function MovieCard({
@@ -17,7 +17,7 @@ export function MovieCard({
   queueItem,
   isAddHint = false,
   onClick,
-}: MovieCardProps) {
+}: Readonly<MovieCardProps>) {
   const posterUrl = getImageUrl(movie, 'poster');
 
   // Calculate Radarr queue progress if applicable
@@ -27,8 +27,12 @@ export function MovieCard({
   }
 
   return (
-    <div className="movie-card" onClick={onClick}>
-      <img src={posterUrl} alt={movie.title} loading="lazy" />
+    <button
+      type="button"
+      className="movie-card"
+      onClick={onClick}
+    >
+      {posterUrl && <img src={posterUrl} alt={movie.title} loading="lazy" />}
       <div className="movie-overlay">
         <h3>{movie.title}</h3>
         <span className="year">{movie.year}</span>
@@ -40,7 +44,7 @@ export function MovieCard({
           </div>
         )}
 
-        {download && (download.status === 'downloading' || download.status === 'paused') && (
+        {(download?.status === 'downloading' || download?.status === 'paused') && (
           <ProgressBar
             value={download.progress}
             isPaused={download.status === 'paused'}
@@ -49,7 +53,7 @@ export function MovieCard({
           />
         )}
 
-        {download && download.status === 'completed' && (
+        {download?.status === 'completed' && (
           <div className="mini-status">
             <Play size={12} fill="currentColor" />
             <span>Téléchargé</span>
@@ -70,6 +74,6 @@ export function MovieCard({
           </>
         )}
       </div>
-    </div>
+    </button>
   );
 }

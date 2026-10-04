@@ -21,12 +21,6 @@
   justify-content: space-between;
   gap: var(--space-lg);
   border: 1px solid rgba(255, 255, 255, 0.04);
-  transition: var(--transition-smooth);
-}
-
-.settings-item:hover {
-  background: rgba(255, 255, 255, 0.03);
-  border-color: rgba(255, 255, 255, 0.06);
 }
 
 .settings-item--block {
@@ -42,7 +36,7 @@
 
 .settings-group-header h4 {
   margin: 0;
-  font-family: var(--font-heading);
+  font-family: var(--font-heading), sans-serif;
   font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text-secondary);
@@ -74,7 +68,7 @@
 }
 
 .settings-section-title h3 {
-  font-family: var(--font-heading);
+  font-family: var(--font-heading), sans-serif;
   font-size: var(--text-md);
   letter-spacing: -0.2px;
   text-transform: none;
@@ -113,7 +107,7 @@
 .config-value {
   font-size: var(--text-sm);
   color: var(--text-primary);
-  font-family: var(--font-body);
+  font-family: var(--font-body), sans-serif;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -131,7 +125,7 @@
 .config-value-highlight {
   font-size: var(--text-base);
   color: var(--text-primary);
-  font-family: var(--font-body);
+  font-family: var(--font-body), sans-serif;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;

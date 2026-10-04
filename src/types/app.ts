@@ -1,4 +1,4 @@
-export type TabType = 'movies' | 'downloads' | 'settings';
+export type TabType = 'movies' | 'series' | 'downloads' | 'settings';
 
 export interface AppInfo {
   version: string;

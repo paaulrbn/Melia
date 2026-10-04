@@ -1,0 +1,132 @@
+/* ==========================================================================
+   Changelog Modal (Minimalist)
+   ========================================================================== */
+
+.changelog-modal-content {
+  background-color: var(--bg-surface-solid);
+  border-radius: 20px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 85vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.changelog-header {
+  padding: 32px 32px 14px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.changelog-title {
+  font-family: var(--font-heading), sans-serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.4px;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.changelog-version {
+  font-family: var(--font-body), sans-serif;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+}
+
+.changelog-body {
+  padding: 10px 32px 20px 32px;
+  overflow-y: auto;
+  flex: 1;
+  max-height: 50vh;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
+.changelog-body::-webkit-scrollbar {
+  width: 5px;
+}
+
+.changelog-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.changelog-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.changelog-group-title {
+  font-family: var(--font-heading), sans-serif;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.2px;
+  margin: 0;
+}
+
+.changelog-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.changelog-list-item {
+  font-family: var(--font-body), sans-serif;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  position: relative;
+  padding-left: 14px;
+}
+
+.changelog-list-item::before {
+  content: '•';
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--text-tertiary);
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.changelog-footer {
+  padding: 16px 32px 32px 32px;
+  display: flex;
+  width: 100%;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.changelog-footer .ui-btn {
+  width: 100%;
+}
+
+@media (max-width: 540px) {
+  .changelog-modal-content {
+    max-width: 92vw;
+    border-radius: 16px;
+  }
+  .changelog-header,
+  .changelog-body,
+  .changelog-footer {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+}

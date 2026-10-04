@@ -1,28 +1,29 @@
+import type { Dispatch, SetStateAction } from 'react';
 import { AppInfo, Config, ConfigField } from '../../types';
-import { RADARR_CONFIG_FIELDS, STREAMING_CONFIG_FIELDS } from '../../utils/constants';
+import { RADARR_CONFIG_FIELDS, SONARR_CONFIG_FIELDS, STREAMING_CONFIG_FIELDS } from '../../utils/constants';
 import { Check } from 'lucide-react';
 import { Button, Input } from '../ui';
 
 interface SettingsViewProps {
-  downloadDir: string;
-  appInfo: AppInfo | null;
-  onSelectFolder: () => void;
-  onOpenFolder: () => void;
-  onResetFolder: () => void;
-  updateVersion: string | null;
-  checkingUpdate: boolean;
-  isInstalling: boolean;
-  updateStatusText: string | null;
-  onManualCheckUpdate: () => void;
-  onInstallUpdate: () => void;
-  config: Config;
-  editingConfig: Config;
-  setEditingConfig: React.Dispatch<React.SetStateAction<Config>>;
-  isEditingConfig: boolean;
-  configSaved: boolean;
-  onStartEditing: () => void;
-  onCancelEditing: () => void;
-  onSaveConfig: () => void;
+  readonly downloadDir: string;
+  readonly appInfo: AppInfo | null;
+  readonly onSelectFolder: () => void;
+  readonly onOpenFolder: () => void;
+  readonly onResetFolder: () => void;
+  readonly updateVersion: string | null;
+  readonly checkingUpdate: boolean;
+  readonly isInstalling: boolean;
+  readonly updateStatusText: string | null;
+  readonly onManualCheckUpdate: () => void;
+  readonly onInstallUpdate: () => void;
+  readonly config: Config;
+  readonly editingConfig: Config;
+  readonly setEditingConfig: Dispatch<SetStateAction<Config>>;
+  readonly isEditingConfig: boolean;
+  readonly configSaved: boolean;
+  readonly onStartEditing: () => void;
+  readonly onCancelEditing: () => void;
+  readonly onSaveConfig: () => void;
 }
 
 function formatConfigValue(field: ConfigField, value?: string): string {
@@ -30,7 +31,7 @@ function formatConfigValue(field: ConfigField, value?: string): string {
   if (field.type === 'password' || field.key === 'MEDIA_SERVER_PASSWORD') {
     return '••••••••';
   }
-  if (field.key === 'RADARR_API_KEY') {
+  if (field.key === 'RADARR_API_KEY' || field.key === 'SONARR_API_KEY') {
     if (value.length > 8) {
       return `${value.slice(0, 4)}••••${value.slice(-4)}`;
     }
@@ -59,7 +60,7 @@ export function SettingsView({
   onStartEditing,
   onCancelEditing,
   onSaveConfig,
-}: SettingsViewProps) {
+}: Readonly<SettingsViewProps>) {
   const currentDownloadDir = downloadDir || appInfo?.default_download_dir || 'Chargement…';
   const isCustomFolder = Boolean(
     downloadDir && appInfo && downloadDir !== appInfo.default_download_dir
@@ -98,7 +99,7 @@ export function SettingsView({
           <div className="settings-item-info">
             <span className="config-label">Version installée</span>
             <span className="config-value-highlight">
-              v{appInfo?.version || '0.2.1'} {updateVersion ? `(v${updateVersion} disponible)` : ''}
+              v{appInfo?.version || '0.3.0'} {updateVersion ? `(v${updateVersion} disponible)` : ''}
             </span>
             {updateStatusText && (
               <span className="settings-status-text">{updateStatusText}</span>
@@ -186,6 +187,46 @@ export function SettingsView({
           ) : (
             <div className="config-grid">
               {RADARR_CONFIG_FIELDS.map(field => (
+                <div key={field.key} className="config-row">
+                  <div className="config-label">{field.label}</div>
+                  <div className="config-value" title={config[field.key] || undefined}>
+                    {formatConfigValue(field, config[field.key])}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Sonarr Sub-group */}
+        <div className="settings-item settings-item--block">
+          <div className="settings-group-header">
+            <h4>Serveur Sonarr</h4>
+          </div>
+          {isEditingConfig ? (
+            <div className="config-grid">
+              {SONARR_CONFIG_FIELDS.map(field => (
+                <div key={field.key} className="config-row">
+                  <label htmlFor={`config-input-${field.key}`} className="config-label">
+                    {field.label}
+                  </label>
+                  <Input
+                    id={`config-input-${field.key}`}
+                    type={field.type || 'text'}
+                    inputSize="sm"
+                    fullWidth
+                    placeholder={field.placeholder}
+                    value={editingConfig[field.key] || ''}
+                    onChange={e =>
+                      setEditingConfig(prev => ({ ...prev, [field.key]: e.target.value }))
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="config-grid">
+              {SONARR_CONFIG_FIELDS.map(field => (
                 <div key={field.key} className="config-row">
                   <div className="config-label">{field.label}</div>
                   <div className="config-value" title={config[field.key] || undefined}>

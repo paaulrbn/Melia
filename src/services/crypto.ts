@@ -18,10 +18,10 @@ export async function decryptConfigPayload(payload: string, password: string): P
     throw new Error('Format de configuration invalide.');
   }
 
-  const salt = Uint8Array.from(safeAtob(saltB64), c => c.charCodeAt(0));
-  const iv = Uint8Array.from(safeAtob(ivB64), c => c.charCodeAt(0));
-  const authTag = Uint8Array.from(safeAtob(authTagB64), c => c.charCodeAt(0));
-  const encrypted = Uint8Array.from(safeAtob(encryptedB64), c => c.charCodeAt(0));
+  const salt = Uint8Array.from(safeAtob(saltB64), c => c.codePointAt(0) ?? 0);
+  const iv = Uint8Array.from(safeAtob(ivB64), c => c.codePointAt(0) ?? 0);
+  const authTag = Uint8Array.from(safeAtob(authTagB64), c => c.codePointAt(0) ?? 0);
+  const encrypted = Uint8Array.from(safeAtob(encryptedB64), c => c.codePointAt(0) ?? 0);
 
   const enc = new TextEncoder();
   const keyMaterial = await window.crypto.subtle.importKey(

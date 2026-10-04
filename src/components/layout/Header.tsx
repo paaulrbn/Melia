@@ -1,24 +1,20 @@
-import { getCurrentWindow } from '@tauri-apps/api/window';
 import { TabType } from '../../types';
 import { Settings } from 'lucide-react';
 import { Badge } from '../ui';
 
 interface HeaderProps {
-  activeTab: TabType;
-  setActiveTab: (tab: TabType) => void;
-  activeDownloadCount: number;
+  readonly activeTab: TabType;
+  readonly setActiveTab: (tab: TabType) => void;
+  readonly activeDownloadCount: number;
 }
 
-export function Header({ activeTab, setActiveTab, activeDownloadCount }: HeaderProps) {
-  const handleDragMouseDown = (e: React.MouseEvent<HTMLElement>) => {
-    const target = e.target as HTMLElement;
-    if (target.closest('button') || target.closest('input')) return;
-    e.preventDefault();
-    getCurrentWindow().startDragging();
-  };
-
+export function Header({
+  activeTab,
+  setActiveTab,
+  activeDownloadCount,
+}: Readonly<HeaderProps>) {
   return (
-    <header className="melia-header" data-tauri-drag-region="true" onMouseDown={handleDragMouseDown}>
+    <header className="melia-header" data-tauri-drag-region="true">
       <h1 style={{ pointerEvents: 'none' }}>Melia</h1>
 
       <div className="header-tabs">
@@ -27,6 +23,12 @@ export function Header({ activeTab, setActiveTab, activeDownloadCount }: HeaderP
           onClick={() => setActiveTab('movies')}
         >
           Films
+        </button>
+        <button
+          className={`tab-btn ${activeTab === 'series' ? 'active' : ''}`}
+          onClick={() => setActiveTab('series')}
+        >
+          Séries
         </button>
         <button
           className={`tab-btn ${activeTab === 'downloads' ? 'active' : ''}`}

@@ -15,7 +15,7 @@ export function formatSpeed(bytesPerSec: number): string {
 }
 
 export function formatTime(seconds: number): string {
-  if (!isFinite(seconds) || seconds <= 0) return '';
+  if (!Number.isFinite(seconds) || seconds <= 0) return '';
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = Math.floor(seconds % 60);
@@ -32,4 +32,15 @@ export function formatDuration(minutes?: number): string {
     return m > 0 ? `${h}\u00A0h\u00A0${m}\u00A0min` : `${h}\u00A0h`;
   }
   return `${m}\u00A0min`;
+}
+
+export function normalizeRootFolder(folder?: string, defaultFolder: string = ''): string {
+  let clean = (folder || '').trim();
+  if (clean && !clean.startsWith('/') && !/^[a-zA-Z]:/.test(clean)) {
+    clean = '/' + clean;
+  }
+  while (clean.length > 1 && clean.endsWith('/')) {
+    clean = clean.slice(0, -1);
+  }
+  return clean || defaultFolder;
 }
