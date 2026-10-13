@@ -40,31 +40,13 @@
   transition: var(--transition-smooth);
 }
 
+.download-item.is-clickable {
+  cursor: pointer;
+}
+
 .download-item.is-clickable:hover {
   background: rgba(255, 255, 255, 0.04);
   border-color: rgba(255, 255, 255, 0.08);
-}
-
-.dl-poster-btn,
-.dl-title-btn {
-  background: none;
-  border: none;
-  padding: 0;
-  margin: 0;
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-  display: block;
-}
-
-.dl-title-btn {
-  flex: 1;
-  min-width: 0;
-}
-
-.dl-title-btn:hover h4 {
-  color: var(--accent-primary, #ffffff);
 }
 
 .dl-poster {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type KeyboardEvent } from 'react';
 import { DownloadInfo, Movie, Series } from '../../types';
 import { Film, Play, Pause, Trash2, X } from 'lucide-react';
 import { Button, IconButton, ProgressBar } from '../ui';
@@ -45,7 +45,11 @@ function DownloadItemActions({
   onOpenDelete,
 }: Readonly<ItemActionsProps>) {
   return (
-    <div className="dl-actions">
+    <div
+      className="dl-actions"
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
       {!isCompleted && (
         <span className="dl-percentage dl-percentage--local">
           {download.progress}%
@@ -163,63 +167,46 @@ export function DownloadItem({
 
   const displaySubTitle = download.subTitle ? ` (${download.subTitle})` : '';
 
-  const renderPoster = () => {
-    const posterContent = posterUrl ? (
-      <img src={posterUrl} alt="" className="dl-poster" />
-    ) : (
-      <div className="dl-poster dl-poster--placeholder">
-        <Film size={18} />
-      </div>
-    );
+  const poster = posterUrl ? (
+    <img src={posterUrl} alt="" className="dl-poster" />
+  ) : (
+    <div className="dl-poster dl-poster--placeholder">
+      <Film size={18} />
+    </div>
+  );
 
-    if (isClickable) {
-      return (
-        <button
-          type="button"
-          className="dl-poster-btn"
-          onClick={triggerSelect}
-          title="Cliquer pour voir les détails"
-        >
-          {posterContent}
-        </button>
-      );
+  const title = (
+    <h4 title={download.title}>
+      {download.title}
+      {download.subTitle && <span className="dl-subtitle"> — {download.subTitle}</span>}
+    </h4>
+  );
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      triggerSelect();
     }
-
-    return posterContent;
-  };
-
-  const renderTitle = () => {
-    const titleContent = (
-      <h4 title={download.title}>
-        {download.title}
-        {download.subTitle && <span className="dl-subtitle"> — {download.subTitle}</span>}
-      </h4>
-    );
-
-    if (isClickable) {
-      return (
-        <button
-          type="button"
-          className="dl-title-btn"
-          onClick={triggerSelect}
-          title="Cliquer pour voir les détails"
-        >
-          {titleContent}
-        </button>
-      );
-    }
-
-    return titleContent;
   };
 
   return (
     <>
-      <div className={`download-item ${isClickable ? 'is-clickable' : ''}`.trim()}>
-        {renderPoster()}
+      <div
+        className={`download-item ${isClickable ? 'is-clickable' : ''}`.trim()}
+        {...(isClickable && {
+          role: 'button',
+          tabIndex: 0,
+          onClick: triggerSelect,
+          onKeyDown: handleKeyDown,
+          title: 'Cliquer pour voir les détails',
+        })}
+      >
+        {poster}
 
         <div className="dl-main">
           <div className="dl-header-row">
-            {renderTitle()}
+            {title}
 
             <DownloadItemActions
               isCompleted={isCompleted}

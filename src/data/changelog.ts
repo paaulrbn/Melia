@@ -1,24 +1,17 @@
 import { ChangelogRelease } from '../types';
 
 export const LATEST_CHANGELOG: ChangelogRelease = {
-  version: '0.3.0',
+  version: '0.3.1',
   groups: [
     {
-      title: 'Fonctionnalités',
+      title: 'Améliorations',
       items: [
-        'Nouvel onglet dédié aux séries',
-        'Recherche et ajout de séries',
-        'Lecture et téléchargement par saison ou par épisode',
-        'Lecture en streaming ou en local',
-        'Amélioration globale de l’interface',
+        'Téléchargements : toute la ligne est cliquable pour ouvrir la fiche',
       ],
     },
     {
       title: 'Corrections de bugs',
-      items: [
-        'Optimisation de la file d’attente et de la synchronisation',
-        'Amélioration de la stabilité des téléchargements et des reprises',
-      ],
+      items: ['Bug fix'],
     },
   ],
 };
