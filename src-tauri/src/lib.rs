@@ -27,7 +27,6 @@ pub fn run() {
                 Ok(())
             }
         })
-        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(DownloadState(Arc::new(Mutex::new(HashMap::new()))))
         .manage(HttpState(http_client))
