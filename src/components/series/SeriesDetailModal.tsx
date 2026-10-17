@@ -274,6 +274,8 @@ function EpisodeRow({
   const isPlayable = isLocal || isServer;
   const isDownloading = dl?.status === 'downloading';
   const isPaused = dl?.status === 'paused';
+  const hasAired = !ep.airDateUtc || new Date(ep.airDateUtc).getTime() <= Date.now();
+  const isMissing = !ep.hasFile && ep.monitored && hasAired && !queueItem && !dl;
   const episodeTitle = ep.title || `Épisode ${ep.episodeNumber}`;
   const tooltip = getEpisodeTooltip(isLocal, isServer, episodeTitle);
 
@@ -331,6 +333,9 @@ function EpisodeRow({
         )}
 
         <div className="episode-meta-row">
+          {isMissing && (
+            <span className="episode-badge episode-badge--missing">Manquant</span>
+          )}
           {ep.runtime ? <span>{formatDuration(ep.runtime)}</span> : null}
           {ep.episodeFile?.size ? (
             <>

@@ -149,6 +149,17 @@
   filter: brightness(0.7) contrast(1.1);
 }
 
+.movie-missing-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: var(--accent-primary);
+  z-index: 4;
+  pointer-events: none;
+}
+
 .movie-overlay {
   position: absolute;
   bottom: 0;

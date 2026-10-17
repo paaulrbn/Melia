@@ -9,6 +9,7 @@ import { useUpdater } from './hooks/useUpdater';
 import { useChangelog } from './hooks/useChangelog';
 import { playVideo } from './services/player';
 
+import { StatusBanner } from './components/common/StatusBanner';
 import { Header } from './components/layout/Header';
 import { UpdateBanner } from './components/layout/UpdateBanner';
 import { MoviesView } from './components/movies/MoviesView';
@@ -131,9 +132,7 @@ function App() {
   );
 
   const handleAutoDownloadReady = useCallback(
-    (movie: Movie) => {
-      void downloadsManager.handleDownloadMovie(movie, configManager.config);
-    },
+    (movie: Movie) => downloadsManager.handleDownloadMovie(movie, configManager.config),
     [downloadsManager, configManager.config]
   );
 
@@ -249,6 +248,38 @@ function App() {
       />
 
       <main className="melia-content">
+        {activeTab === 'movies' && moviesManager.loadError && (
+          <StatusBanner
+            title="Radarr injoignable"
+            detail={moviesManager.loadError}
+            onRetry={() => void moviesManager.loadMovies()}
+          />
+        )}
+        {activeTab === 'series' && seriesManager.loadError && (
+          <StatusBanner
+            title="Sonarr injoignable"
+            detail={seriesManager.loadError}
+            onRetry={() => void seriesManager.loadSeries()}
+          />
+        )}
+        {configManager.keychainWarning && (
+          <StatusBanner
+            title="Trousseau indisponible"
+            detail={configManager.keychainWarning}
+            onDismiss={configManager.dismissKeychainWarning}
+          />
+        )}
+        {(moviesManager.actionError || seriesManager.actionError) && (
+          <StatusBanner
+            title="L'action a échoué"
+            detail={moviesManager.actionError || seriesManager.actionError}
+            onDismiss={() => {
+              moviesManager.clearActionError();
+              seriesManager.clearActionError();
+            }}
+          />
+        )}
+
         <div style={{ display: activeTab === 'movies' ? 'block' : 'none' }}>
           <MoviesView
             searchQuery={searchManager.searchQuery}
@@ -371,6 +402,8 @@ function App() {
         onDeleteDownload={downloadsManager.handleDeleteDownload}
         onDeleteServerMovie={moviesManager.handleDeleteServerMovie}
         onCancelServerQueue={moviesManager.handleCancelQueueItem}
+        qualityProfiles={moviesManager.qualityProfiles}
+        onChangeQuality={moviesManager.handleChangeMovieQuality}
       />
 
       <AddMovieModal

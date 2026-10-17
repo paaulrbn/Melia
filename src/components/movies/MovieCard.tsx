@@ -26,6 +26,14 @@ export function MovieCard({
     serverProgress = Math.round(((queueItem.size - queueItem.sizeleft) / queueItem.size) * 100);
   }
 
+  // Library movie monitored by Radarr but with no file, not downloading and not in the queue
+  const isMissing =
+    'hasFile' in movie &&
+    !movie.hasFile &&
+    movie.monitored !== false &&
+    !queueItem &&
+    !download;
+
   return (
     <button
       type="button"
@@ -33,6 +41,7 @@ export function MovieCard({
       onClick={onClick}
     >
       {posterUrl && <img src={posterUrl} alt={movie.title} loading="lazy" />}
+      {isMissing && <span className="movie-missing-band" title="Film manquant sur le serveur" />}
       <div className="movie-overlay">
         <h3>{movie.title}</h3>
         <span className="year">{movie.year}</span>

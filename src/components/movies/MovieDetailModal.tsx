@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { Config, DownloadInfo, Movie, QueueRecord } from '../../types';
+import { Config, DownloadInfo, Movie, QualityProfile, QueueRecord } from '../../types';
 import { formatDuration, formatSize } from '../../utils/formatters';
 import { getImageUrl, getStreamUrl } from '../../utils/media';
 import { Modal } from '../common/Modal';
 import { ConfirmModal } from '../common/ConfirmModal';
-import { Play, Pause, Trash2, Download, X } from 'lucide-react';
-import { Button, IconButton, ProgressBar } from '../ui';
+import { Play, Pause, Trash2, Download, X, Search, Loader2 } from 'lucide-react';
+import { Button, IconButton, ProgressBar, Select } from '../ui';
 
 interface MovieDetailModalProps {
   readonly movie: Movie | null;
@@ -21,6 +21,8 @@ interface MovieDetailModalProps {
   readonly onDeleteDownload: (id: string, deleteFromDisk: boolean, fallbackFilename?: string) => void;
   readonly onDeleteServerMovie: (movieId: number) => void;
   readonly onCancelServerQueue?: (queueId: number) => void;
+  readonly qualityProfiles?: QualityProfile[];
+  readonly onChangeQuality?: (movieId: number, qualityProfileId: number) => Promise<boolean>;
 }
 
 export function MovieDetailModal({
@@ -37,7 +39,12 @@ export function MovieDetailModal({
   onDeleteDownload,
   onDeleteServerMovie,
   onCancelServerQueue,
+  qualityProfiles = [],
+  onChangeQuality,
 }: Readonly<MovieDetailModalProps>) {
+  const [qualityOverride, setQualityOverride] = useState<{ movieId: number; value: number } | null>(null);
+  const [isSearchingQuality, setIsSearchingQuality] = useState(false);
+  const [qualitySearchStatus, setQualitySearchStatus] = useState<{ movieId: number; ok: boolean } | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showCancelDownloadConfirm, setShowCancelDownloadConfirm] = useState(false);
   const [showCancelServerQueueConfirm, setShowCancelServerQueueConfirm] = useState(false);
@@ -102,7 +109,53 @@ export function MovieDetailModal({
         );
       }
 
+      const selectedQualityId =
+        qualityOverride?.movieId === movie.id ? qualityOverride.value : movie.qualityProfileId;
+      const status = qualitySearchStatus?.movieId === movie.id ? qualitySearchStatus : null;
+
+      const handleSearchWithQuality = async () => {
+        if (!onChangeQuality || !selectedQualityId) return;
+        setIsSearchingQuality(true);
+        setQualitySearchStatus(null);
+        const ok = await onChangeQuality(movie.id, selectedQualityId);
+        setQualitySearchStatus({ movieId: movie.id, ok });
+        setIsSearchingQuality(false);
+      };
+
       return (
+        <div className="modal-actions-wrapper">
+        {onChangeQuality && qualityProfiles.length > 0 && (
+          <div className="modal-quality-row">
+            <Select
+              label="Qualité :"
+              value={selectedQualityId ?? ''}
+              onChange={e => setQualityOverride({ movieId: movie.id, value: Number(e.target.value) })}
+              options={qualityProfiles.map(qp => ({ value: qp.id, label: qp.name }))}
+              disabled={isSearchingQuality}
+              style={{ minWidth: '200px' }}
+            />
+            <Button
+              variant="secondary"
+              size="md"
+              leftIcon={
+                isSearchingQuality ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Search size={16} />
+                )
+              }
+              onClick={handleSearchWithQuality}
+              disabled={isSearchingQuality || !selectedQualityId}
+            >
+              Relancer la recherche
+            </Button>
+            {status && (
+              <span className={status.ok ? 'modal-quality-status' : 'modal-quality-status modal-quality-status--error'}>
+                {status.ok ? 'Recherche lancée sur Radarr' : 'Échec de la modification'}
+              </span>
+            )}
+          </div>
+        )}
         <div className="modal-actions">
           <p className="unavailable-text">
             Ce film n'est pas encore disponible sur le serveur. En attente de téléchargement.
@@ -116,6 +169,7 @@ export function MovieDetailModal({
             title="Supprimer du serveur"
             aria-label="Supprimer du serveur"
           />
+        </div>
         </div>
       );
     }
