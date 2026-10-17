@@ -50,8 +50,8 @@ export function useUpdater() {
       } else {
         setUpdateStatusText(`Vous utilisez la dernière version (v${res.current_version})`);
       }
-    } catch (e: any) {
-      setUpdateStatusText(`Erreur : ${e?.message || e}`);
+    } catch (e: unknown) {
+      setUpdateStatusText(`Erreur : ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setCheckingUpdate(false);
     }

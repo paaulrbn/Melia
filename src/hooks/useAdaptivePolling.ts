@@ -16,25 +16,37 @@ export function useAdaptivePolling(
 
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
     let isCancelled = false;
+    // Invariant: at most one pending timer or one in-flight request at any time.
+    let inFlight = false;
 
     const poll = async () => {
-      if (isCancelled) return;
+      if (isCancelled || inFlight) return;
 
       if (document.visibilityState === 'hidden') {
         return;
       }
 
-      const hasActiveItems = await pollFn();
+      inFlight = true;
+      let hasActiveItems = false;
+      try {
+        hasActiveItems = await pollFn();
+      } catch {
+        hasActiveItems = false;
+      } finally {
+        inFlight = false;
+      }
 
       if (!isCancelled) {
+        if (timeoutId) clearTimeout(timeoutId);
         const delay = hasActiveItems ? 3000 : 15000;
-        timeoutId = setTimeout(poll, delay);
+        timeoutId = setTimeout(() => void poll(), delay);
       }
     };
 
     const handleWakeup = () => {
       if (document.visibilityState === 'visible') {
         if (timeoutId) clearTimeout(timeoutId);
+        timeoutId = null;
         void poll();
       }
     };
