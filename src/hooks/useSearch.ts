@@ -42,7 +42,7 @@ export function useSearch(config: Config) {
         }
 
         try {
-          const data = await searchRadarrMovies(baseUrl, apiKey, term);
+          const data = await searchRadarrMovies(term);
           if (requestId === movieRequestIdRef.current) {
             setMovieSearchResults(data);
           }
@@ -93,7 +93,7 @@ export function useSearch(config: Config) {
         }
 
         try {
-          const data = await searchSonarrSeries(baseUrl, apiKey, term);
+          const data = await searchSonarrSeries(term);
           if (requestId === seriesRequestIdRef.current) {
             setSeriesSearchResults(data);
           }

@@ -1,5 +1,5 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invokeSynced } from './runtime';
 
 export async function playVideo(pathOrUrl: string): Promise<void> {
-  await invoke('play_video', { url: pathOrUrl });
+  await invokeSynced('play_video', { url: pathOrUrl });
 }

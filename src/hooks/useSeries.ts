@@ -31,15 +31,15 @@ function stripTrailingSlashes(path: string): string {
   return trimmed;
 }
 
-async function resolveSonarrRootFolder(
-  sonarrUrl: string,
-  sonarrKey: string,
-  configuredRoot: string
-): Promise<string> {
+function readErrorMessage(raw: unknown): string {
+  return typeof raw === 'string' ? raw : (raw as Error)?.message || 'Erreur inconnue';
+}
+
+async function resolveSonarrRootFolder(configuredRoot: string): Promise<string> {
   let cleanRoot = normalizeRootFolder(configuredRoot, '/tv');
 
   try {
-    const rootFolders = await fetchSonarrRootFolders(sonarrUrl, sonarrKey);
+    const rootFolders = await fetchSonarrRootFolders();
     if (rootFolders && rootFolders.length > 0) {
       const matched = rootFolders.find(rf => {
         const rfPath = stripTrailingSlashes(rf.path);
@@ -74,7 +74,7 @@ function parseSonarrErrorMessage(error: unknown): string {
       const jsonStr = msg.slice(startIdx, endIdx + 1);
       const parsed = JSON.parse(jsonStr);
       if (Array.isArray(parsed) && parsed[0]?.errorMessage) {
-        return parsed.map((p: any) => p.errorMessage).join(', ');
+        return parsed.map((p: { errorMessage?: string }) => p.errorMessage).join(', ');
       }
     } catch {
       // Ignored: fallback to original message if JSON parsing fails
@@ -87,6 +87,8 @@ function parseSonarrErrorMessage(error: unknown): string {
 export function useSeries({ config, downloads }: UseSeriesProps) {
   const [series, setSeries] = useState<Series[]>([]);
   const [selectedSeries, setSelectedSeries] = useState<Series | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // Lazy-loaded episodes cache: seriesId -> Episode[]
   const [episodesCache, setEpisodesCache] = useState<Record<number, Episode[]>>({});
@@ -113,10 +115,11 @@ export function useSeries({ config, downloads }: UseSeriesProps) {
     if (!baseUrl || !apiKey) return;
 
     try {
-      const data = await fetchSonarrSeries(baseUrl, apiKey);
+      const data = await fetchSonarrSeries();
       setSeries(data);
-    } catch {
-      // Failed to load series; ignore
+      setLoadError(null);
+    } catch (e: unknown) {
+      setLoadError(readErrorMessage(e));
     }
   }, [sonarrUrl, sonarrKey]);
 
@@ -131,8 +134,8 @@ export function useSeries({ config, downloads }: UseSeriesProps) {
     setIsLoadingEpisodes(true);
     try {
       const [episodes, files] = await Promise.all([
-        fetchSonarrEpisodes(sonarrUrl, sonarrKey, seriesId),
-        fetchSonarrEpisodeFiles(sonarrUrl, sonarrKey, seriesId),
+        fetchSonarrEpisodes(seriesId),
+        fetchSonarrEpisodeFiles(seriesId),
       ]);
 
       const filesMap = new Map(files.map(f => [f.id, f]));
@@ -159,7 +162,7 @@ export function useSeries({ config, downloads }: UseSeriesProps) {
       // Also, refresh series detail in background to update stats
       if (sonarrUrl && sonarrKey) {
         try {
-          const updated = await fetchSonarrSeriesDetail(sonarrUrl, sonarrKey, s.id);
+          const updated = await fetchSonarrSeriesDetail(s.id);
           setSelectedSeries(prev => (prev?.id === s.id ? updated : prev));
           setSeries(prev => prev.map(item => (item.id === s.id ? updated : item)));
         } catch {
@@ -181,8 +184,9 @@ export function useSeries({ config, downloads }: UseSeriesProps) {
     if (!sonarrUrl || !sonarrKey) return false;
 
     try {
-      const queueList = await fetchSonarrQueue(sonarrUrl, sonarrKey);
+      const queueList = await fetchSonarrQueue();
       setSonarrQueue(queueList);
+      setLoadError(null);
 
       const currentKeys = new Set(queueList.map(item => item.id));
       const prevKeys = prevQueueKeysRef.current;
@@ -196,8 +200,8 @@ export function useSeries({ config, downloads }: UseSeriesProps) {
       }
       prevQueueKeysRef.current = currentKeys;
       return queueList.length > 0;
-    } catch {
-      // Failed to poll Sonarr queue; return false
+    } catch (e: unknown) {
+      setLoadError(readErrorMessage(e));
       return false;
     }
   }, [sonarrUrl, sonarrKey, loadSeries, selectedSeries, loadSeriesEpisodes]);
@@ -248,7 +252,7 @@ export function useSeries({ config, downloads }: UseSeriesProps) {
 
     if (sonarrUrl && sonarrKey) {
       try {
-        const profiles = await fetchSonarrQualityProfiles(sonarrUrl, sonarrKey);
+        const profiles = await fetchSonarrQualityProfiles();
         setQualityProfiles(profiles);
         if (profiles.length > 0) {
           setSelectedQuality(profiles[0].id);
@@ -272,15 +276,9 @@ export function useSeries({ config, downloads }: UseSeriesProps) {
     setAddSeriesError(null);
 
     try {
-      const cleanRoot = await resolveSonarrRootFolder(
-        sonarrUrl,
-        sonarrKey,
-        config['SONARR_ROOT_FOLDER']
-      );
+      const cleanRoot = await resolveSonarrRootFolder(config['SONARR_ROOT_FOLDER']);
 
       await addSonarrSeries({
-        baseUrl: sonarrUrl,
-        apiKey: sonarrKey,
         rootFolder: cleanRoot,
         tvdbId: addingSeries.tvdbId,
         title: addingSeries.title,
@@ -307,7 +305,7 @@ export function useSeries({ config, downloads }: UseSeriesProps) {
   const handleDeleteSeries = useCallback(async (seriesId: number) => {
     if (!sonarrUrl || !sonarrKey) return;
     try {
-      await deleteSonarrSeries(sonarrUrl, sonarrKey, seriesId);
+      await deleteSonarrSeries(seriesId);
       setSeries(prev => prev.filter(s => s.id !== seriesId));
       setSelectedSeries(null);
       setEpisodesCache(prev => {
@@ -315,31 +313,31 @@ export function useSeries({ config, downloads }: UseSeriesProps) {
         delete next[seriesId];
         return next;
       });
-    } catch {
-      // ignore
+    } catch (e: unknown) {
+      setActionError(`Suppression impossible : ${readErrorMessage(e)}`);
     }
   }, [sonarrUrl, sonarrKey]);
 
   const handleDeleteEpisodeFile = useCallback(async (seriesId: number, episodeFileId: number) => {
     if (!sonarrUrl || !sonarrKey) return;
     try {
-      await deleteSonarrEpisodeFile(sonarrUrl, sonarrKey, episodeFileId);
+      await deleteSonarrEpisodeFile(episodeFileId);
       await loadSeriesEpisodes(seriesId, true);
-      const updated = await fetchSonarrSeriesDetail(sonarrUrl, sonarrKey, seriesId);
+      const updated = await fetchSonarrSeriesDetail(seriesId);
       setSelectedSeries(prev => (prev?.id === seriesId ? updated : prev));
       setSeries(prev => prev.map(item => (item.id === seriesId ? updated : item)));
-    } catch {
-      // ignore
+    } catch (e: unknown) {
+      setActionError(`Suppression du fichier impossible : ${readErrorMessage(e)}`);
     }
   }, [sonarrUrl, sonarrKey, loadSeriesEpisodes]);
 
   const handleCancelQueueItem = useCallback(async (queueId: number) => {
     if (!sonarrUrl || !sonarrKey) return;
     try {
-      await deleteSonarrQueueItem(sonarrUrl, sonarrKey, queueId);
+      await deleteSonarrQueueItem(queueId);
       await pollQueue();
-    } catch {
-      // ignore
+    } catch (e: unknown) {
+      setActionError(`Annulation impossible : ${readErrorMessage(e)}`);
     }
   }, [sonarrUrl, sonarrKey, pollQueue]);
 
@@ -387,12 +385,12 @@ export function useSeries({ config, downloads }: UseSeriesProps) {
     async (episodeId: number) => {
       if (!sonarrUrl || !sonarrKey) return;
       try {
-        await triggerSonarrEpisodeSearch(sonarrUrl, sonarrKey, [episodeId]);
+        await triggerSonarrEpisodeSearch([episodeId]);
         setTimeout(() => {
           pollQueue();
         }, 1500);
-      } catch {
-        // ignore
+      } catch (e: unknown) {
+        setActionError(`Recherche impossible : ${readErrorMessage(e)}`);
       }
     },
     [sonarrUrl, sonarrKey, pollQueue]
@@ -402,12 +400,12 @@ export function useSeries({ config, downloads }: UseSeriesProps) {
     async (seriesId: number, seasonNumber: number) => {
       if (!sonarrUrl || !sonarrKey) return;
       try {
-        await triggerSonarrSeasonSearch(sonarrUrl, sonarrKey, seriesId, seasonNumber);
+        await triggerSonarrSeasonSearch(seriesId, seasonNumber);
         setTimeout(() => {
           pollQueue();
         }, 1500);
-      } catch {
-        // ignore
+      } catch (e: unknown) {
+        setActionError(`Recherche impossible : ${readErrorMessage(e)}`);
       }
     },
     [sonarrUrl, sonarrKey, pollQueue]
@@ -442,5 +440,8 @@ export function useSeries({ config, downloads }: UseSeriesProps) {
     findInLibrary,
     loadSeries,
     loadSeriesEpisodes,
+    loadError,
+    actionError,
+    clearActionError: () => setActionError(null),
   };
 }

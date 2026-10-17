@@ -14,8 +14,20 @@ import {
   syncEpisodesWithDisk,
   syncScannedEpisodesWithDisk,
   getEpisodeDownloadRelativePath,
+  getMovieDownloadFilename,
+  DownloadError,
 } from '../services/downloads';
 import { selectFolder, openFolder } from '../services/system';
+import { syncDownloadDir } from '../services/runtime';
+
+function readDirHistory(): string[] {
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(STORAGE_KEYS.DOWNLOAD_DIR_HISTORY) || '[]');
+    return Array.isArray(parsed) ? parsed.filter((dir): dir is string => typeof dir === 'string') : [];
+  } catch {
+    return [];
+  }
+}
 
 function isBetterKey(candidateKey: string, currentKey: string): boolean {
   const candidateIsNumericEp = /^episode-\d+$/.test(candidateKey);
@@ -101,12 +113,11 @@ async function resolveCancellationPath(
 
 async function resolveDeletePath(
   resolvedPath: string | undefined,
-  fallbackFilename?: string,
-  downloadDir?: string
+  fallbackFilename?: string
 ): Promise<string | undefined> {
   if (resolvedPath || !fallbackFilename) return resolvedPath;
   try {
-    return await getDownloadPath(fallbackFilename, downloadDir || undefined);
+    return await getDownloadPath(fallbackFilename);
   } catch {
     return undefined;
   }
@@ -116,14 +127,13 @@ async function cleanupLocalDownload(
   id: string,
   dl: DownloadInfo | undefined,
   deleteFromDisk: boolean,
-  fallbackFilename?: string,
-  downloadDir?: string
+  fallbackFilename?: string
 ): Promise<void> {
   let resolvedPath = await resolveCancellationPath(id, dl, deleteFromDisk);
 
   if (!deleteFromDisk) return;
 
-  resolvedPath = await resolveDeletePath(resolvedPath, fallbackFilename, downloadDir);
+  resolvedPath = await resolveDeletePath(resolvedPath, fallbackFilename);
   if (!resolvedPath) return;
 
   if (dl?.status === 'downloading') {
@@ -138,20 +148,27 @@ async function cleanupLocalDownload(
 
 async function getValidExistingKeys(downloads: Record<string, DownloadInfo>): Promise<Set<string>> {
   const validKeys = new Set<string>();
+  const toCheck: [string, string][] = [];
   for (const [key, info] of Object.entries(downloads)) {
     if (info.status === 'downloading' || info.status === 'paused' || !info.path) {
       validKeys.add(key);
-      continue;
+    } else {
+      toCheck.push([key, info.path]);
     }
-    try {
-      const exists = await checkFileExists(info.path);
-      if (exists) {
-        validKeys.add(key);
+  }
+
+  const checks = await Promise.all(
+    toCheck.map(async ([key, path]) => {
+      try {
+        return (await checkFileExists(path)) ? key : null;
+      } catch {
+        // If check fails, retain key to prevent accidental cleanup
+        return key;
       }
-    } catch {
-      // If check fails, retain key to prevent accidental cleanup
-      validKeys.add(key);
-    }
+    })
+  );
+  for (const key of checks) {
+    if (key) validKeys.add(key);
   }
   return validKeys;
 }
@@ -276,6 +293,27 @@ export function useDownloads() {
     return localStorage.getItem(STORAGE_KEYS.DOWNLOAD_DIR) || '';
   });
 
+  // Folders used before the current one (files downloaded there must stay usable)
+  const [previousDirs, setPreviousDirs] = useState<string[]>(readDirHistory);
+
+  const rememberDir = (dir: string) => {
+    if (!dir) return;
+    setPreviousDirs(prev => {
+      const next = [dir, ...prev.filter(item => item !== dir)].slice(0, 10);
+      try {
+        localStorage.setItem(STORAGE_KEYS.DOWNLOAD_DIR_HISTORY, JSON.stringify(next));
+      } catch {
+        // Storage write failed; the history stays in memory
+      }
+      return next;
+    });
+  };
+
+  // The download folders are held by Rust: every path command is restricted to them
+  useEffect(() => {
+    void syncDownloadDir(downloadDir, previousDirs);
+  }, [downloadDir, previousDirs]);
+
   const cancelledIdsRef = useRef<Set<string>>(new Set());
   const downloadsRef = useRef<Record<string, DownloadInfo>>(downloads);
   downloadsRef.current = downloads;
@@ -369,17 +407,21 @@ export function useDownloads() {
     }));
   };
 
-  const handleDownloadFailure = (key: string, error: unknown) => {
-    if (cancelledIdsRef.current.has(key)) {
+  /** Returns true when the download really failed (not paused, cancelled or already running). */
+  const handleDownloadFailure = (key: string, error: unknown): boolean => {
+    const code = error instanceof DownloadError ? error.code : 'FAILED';
+    // Duplicate start refused by Rust: the original download is still running, leave it alone.
+    if (code === 'ALREADY_RUNNING') return false;
+    if (code === 'CANCELLED' || cancelledIdsRef.current.has(key)) {
       cancelledIdsRef.current.delete(key);
       setDownloads(prev => {
         const next = { ...prev };
         delete next[key];
         return next;
       });
-      return;
+      return false;
     }
-    const isPaused = String(error).includes('pause');
+    const isPaused = code === 'PAUSED';
     setDownloads(prev => ({
       ...prev,
       [key]: {
@@ -389,18 +431,19 @@ export function useDownloads() {
         speed: undefined,
       },
     }));
+    return !isPaused;
   };
 
-  const handleDownloadMovie = async (movie: Movie, config: Config) => {
+  /** Resolves to false when the download failed, so callers (auto-download) can retry later. */
+  const handleDownloadMovie = async (movie: Movie, config: Config): Promise<boolean> => {
     const key = `movie-${movie.id}`;
-    if (!movie.movieFile || downloadsRef.current[key]?.status === 'downloading') return;
+    if (!movie.movieFile) return false;
+    if (downloadsRef.current[key]?.status === 'downloading') return true;
     cancelledIdsRef.current.delete(key);
 
     const url = getStreamUrl(movie.movieFile.path, config);
-    const ext = movie.movieFile.path.split('.').pop() || 'mkv';
-    const filename = `${movie.title} (${movie.year}).${ext}`;
-    const customDir = downloadDir || undefined;
-    const initialPath = await getDownloadPath(filename, customDir).catch(() => '');
+    const filename = getMovieDownloadFilename(movie);
+    const initialPath = await getDownloadPath(filename).catch(() => '');
 
     setDownloads(prev => ({
       ...prev,
@@ -418,16 +461,18 @@ export function useDownloads() {
     }));
 
     try {
-      const savedPath = await startDownload(url, filename, key, customDir);
+      const savedPath = await startDownload(url, filename, key);
       handleDownloadComplete(key, savedPath);
+      return true;
     } catch (e) {
-      handleDownloadFailure(key, e);
+      return !handleDownloadFailure(key, e);
     }
   };
 
-  const handleDownloadEpisode = async (series: Series, episode: Episode, config: Config) => {
+  const handleDownloadEpisode = async (series: Series, episode: Episode, config: Config): Promise<boolean> => {
     const key = `episode-${episode.id}`;
-    if (!episode.episodeFile || downloadsRef.current[key]?.status === 'downloading') return;
+    if (!episode.episodeFile) return false;
+    if (downloadsRef.current[key]?.status === 'downloading') return true;
     cancelledIdsRef.current.delete(key);
 
     const url = getStreamUrl(episode.episodeFile.path, config);
@@ -436,8 +481,7 @@ export function useDownloads() {
     const eStr = String(episode.episodeNumber).padStart(2, '0');
     const titlePart = episode.title ? ` • ${episode.title}` : '';
     const subTitle = `S${sStr}E${eStr}${titlePart}`;
-    const customDir = downloadDir || undefined;
-    const initialPath = await getDownloadPath(relPath, customDir).catch(() => '');
+    const initialPath = await getDownloadPath(relPath).catch(() => '');
 
     setDownloads(prev => ({
       ...prev,
@@ -459,10 +503,11 @@ export function useDownloads() {
     }));
 
     try {
-      const savedPath = await startDownload(url, relPath, key, customDir);
+      const savedPath = await startDownload(url, relPath, key);
       handleDownloadComplete(key, savedPath);
+      return true;
     } catch (e) {
-      handleDownloadFailure(key, e);
+      return !handleDownloadFailure(key, e);
     }
   };
 
@@ -492,7 +537,7 @@ export function useDownloads() {
   ) => {
     cancelledIdsRef.current.add(id);
     const dl = downloadsRef.current[id];
-    await cleanupLocalDownload(id, dl, deleteFromDisk, fallbackFilename, downloadDir);
+    await cleanupLocalDownload(id, dl, deleteFromDisk, fallbackFilename);
 
     setDownloads(prev => {
       const next = { ...prev };
@@ -505,6 +550,7 @@ export function useDownloads() {
     try {
       const selected = await selectFolder();
       if (selected) {
+        if (selected !== downloadDir) rememberDir(downloadDir);
         setDownloadDir(selected);
         localStorage.setItem(STORAGE_KEYS.DOWNLOAD_DIR, selected);
       }
@@ -526,6 +572,7 @@ export function useDownloads() {
 
   const handleResetFolder = (defaultDir: string) => {
     if (defaultDir) {
+      if (defaultDir !== downloadDir) rememberDir(downloadDir);
       setDownloadDir(defaultDir);
       localStorage.removeItem(STORAGE_KEYS.DOWNLOAD_DIR);
     }

@@ -14,10 +14,12 @@ export function getImageUrl(
   return url || null;
 }
 
+/**
+ * Media server URL for a file, without credentials: the Basic auth header is added on the Rust side
+ * (downloader and local playback proxy), so the password never appears in a URL or a process argument.
+ */
 export function getStreamUrl(filePath: string, config: Config): string {
   const host = config['MEDIA_SERVER_HOST']?.replace(/^(https?:\/\/)/, '').replace(/\/$/, '');
-  const user = config['MEDIA_SERVER_USERNAME'];
-  const pass = config['MEDIA_SERVER_PASSWORD'];
   const rootPath = config['MEDIA_SERVER_ROOT_PATH'] || '/paul';
 
   let cleanPath = filePath;
@@ -28,8 +30,5 @@ export function getStreamUrl(filePath: string, config: Config): string {
 
   if (cleanPath.startsWith('/')) cleanPath = cleanPath.slice(1);
 
-  if (user && pass) {
-    return `https://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${host}/${cleanPath}`;
-  }
-  return `https://${host}/${cleanPath}`;
+  return `https://${host}/${cleanPath.split('/').map(encodeURIComponent).join('/')}`;
 }

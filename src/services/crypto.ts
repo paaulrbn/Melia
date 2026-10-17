@@ -1,4 +1,5 @@
 import { Config } from '../types';
+import { RADARR_CONFIG_FIELDS, SONARR_CONFIG_FIELDS, STREAMING_CONFIG_FIELDS } from '../utils/constants';
 
 function safeAtob(base64: string): string {
   let b64 = base64;
@@ -52,5 +53,27 @@ export async function decryptConfigPayload(payload: string, password: string): P
 
   const dec = new TextDecoder();
   const decryptedString = dec.decode(decryptedBuffer);
-  return JSON.parse(decryptedString) as Config;
+  return validateConfigShape(JSON.parse(decryptedString));
+}
+
+const ALLOWED_CONFIG_KEYS = new Set<string>([
+  ...RADARR_CONFIG_FIELDS,
+  ...SONARR_CONFIG_FIELDS,
+  ...STREAMING_CONFIG_FIELDS,
+].map(field => field.key));
+
+/** Keeps only known keys and refuses anything that is not a flat object of strings. */
+export function validateConfigShape(value: unknown): Config {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Format de configuration invalide.');
+  }
+  const config: Config = {};
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    if (!ALLOWED_CONFIG_KEYS.has(key)) continue;
+    if (typeof entry !== 'string') {
+      throw new Error('Format de configuration invalide.');
+    }
+    config[key] = entry;
+  }
+  return config;
 }

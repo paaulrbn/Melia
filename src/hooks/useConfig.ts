@@ -1,15 +1,25 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getCurrent, onOpenUrl } from '@tauri-apps/plugin-deep-link';
 import { Config } from '../types';
-import { STORAGE_KEYS } from '../utils/constants';
 import { getNativeConfig } from '../services/system';
 import { decryptConfigPayload } from '../services/crypto';
+import { loadSavedConfig, persistConfig } from '../services/secrets';
+import { syncApiConfig } from '../services/runtime';
 
 export function useConfig() {
   const [config, setConfig] = useState<Config>({});
   const [editingConfig, setEditingConfig] = useState<Config>({});
   const [isEditingConfig, setIsEditingConfig] = useState(false);
   const [configSaved, setConfigSaved] = useState(false);
+  const [keychainWarning, setKeychainWarning] = useState<string | null>(null);
+
+  const warnIfStoredInClear = (storedInClear: string[]) => {
+    setKeychainWarning(
+      storedInClear.length > 0
+        ? 'Le trousseau du système est indisponible : les clés et mots de passe sont enregistrés en clair sur cet appareil.'
+        : null
+    );
+  };
 
   // Deep link prompt state
   const [showConfigPrompt, setShowConfigPrompt] = useState(false);
@@ -43,13 +53,14 @@ export function useConfig() {
     if (!configPayload || !configPassword) return;
     try {
       const parsedConfig = await decryptConfigPayload(configPayload, configPassword);
-      localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(parsedConfig));
+      warnIfStoredInClear(await persistConfig(parsedConfig));
       setConfig(parsedConfig);
       setEditingConfig(parsedConfig);
       setShowConfigPrompt(false);
       setConfigPayload(null);
-    } catch (e: any) {
-      setConfigError(`Erreur: ${e.message || 'Mot de passe incorrect ou données corrompues.'}`);
+    } catch (e: unknown) {
+      const message = e instanceof Error && e.message ? e.message : 'Mot de passe incorrect ou données corrompues.';
+      setConfigError(`Erreur: ${message}`);
     }
   };
 
@@ -62,13 +73,10 @@ export function useConfig() {
 
   const loadConfig = useCallback(async () => {
     let conf: Config = {};
-    const savedConfig = localStorage.getItem(STORAGE_KEYS.CONFIG);
-    if (savedConfig) {
-      try {
-        conf = JSON.parse(savedConfig);
-      } catch (_e) {
-        // ignore
-      }
+    try {
+      conf = await loadSavedConfig();
+    } catch (_e) {
+      // ignore
     }
 
     if (Object.keys(conf).length === 0) {
@@ -108,10 +116,18 @@ export function useConfig() {
     };
   }, [handleDeepLink, loadConfig]);
 
+  // Radarr/Sonarr/media settings are held by Rust; push them on every change.
+  // Declared before the library hooks' effects so requests never run with stale settings.
+  useEffect(() => {
+    void syncApiConfig(config);
+  }, [config]);
+
   const saveConfig = () => {
     const newConfig = { ...config, ...editingConfig };
     setConfig(newConfig);
-    localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(newConfig));
+    // Pushed right away: callers reload the libraries in the same handler, before effects run
+    void syncApiConfig(newConfig);
+    void persistConfig(newConfig).then(warnIfStoredInClear);
     setConfigSaved(true);
     setIsEditingConfig(false);
     setTimeout(() => setConfigSaved(false), 2000);
@@ -133,6 +149,8 @@ export function useConfig() {
     setEditingConfig,
     isEditingConfig,
     configSaved,
+    keychainWarning,
+    dismissKeychainWarning: () => setKeychainWarning(null),
     startEditing,
     cancelEditing,
     saveConfig,

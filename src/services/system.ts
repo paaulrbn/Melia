@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { AppInfo, Config, UpdateCheckResult } from '../types';
+import { invokeSynced } from './runtime';
 
 export async function getNativeConfig(): Promise<Config> {
   return invoke<Config>('get_config');
@@ -14,7 +15,7 @@ export async function selectFolder(): Promise<string | null> {
 }
 
 export async function openFolder(path: string): Promise<void> {
-  await invoke('open_folder', { path });
+  await invokeSynced('open_folder', { path });
 }
 
 export async function checkUpdate(): Promise<UpdateCheckResult> {

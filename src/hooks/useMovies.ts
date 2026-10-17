@@ -9,6 +9,7 @@ import {
   fetchQualityProfiles as apiFetchQualityProfiles,
   addRadarrMovie,
   triggerRadarrMovieSearch,
+  updateRadarrMovieQuality,
   deleteRadarrMovie,
   deleteRadarrQueueItem,
   fetchRadarrQueue,
@@ -18,7 +19,12 @@ interface UseMoviesProps {
   config: Config;
   downloads: Record<string, DownloadInfo>;
   onMoviesFetched?: (movies: Movie[]) => void;
-  onAutoDownloadReady?: (movie: Movie) => void;
+  /** Resolves to false when the download could not start, so the movie stays queued for a retry. */
+  onAutoDownloadReady?: (movie: Movie) => Promise<boolean> | void;
+}
+
+function readErrorMessage(raw: unknown): string {
+  return typeof raw === 'string' ? raw : (raw as Error)?.message || 'Erreur inconnue';
 }
 
 function parseRadarrErrorMessage(raw: unknown): string {
@@ -47,6 +53,8 @@ export function useMovies({
 }: UseMoviesProps) {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // Keep a ref to onMoviesFetched to avoid effect re-runs on render
   const onMoviesFetchedRef = useRef(onMoviesFetched);
@@ -87,34 +95,42 @@ export function useMovies({
   const radarrUrl = config['RADARR_BASE_URL'];
   const radarrKey = config['RADARR_API_KEY'];
 
-  // Check if any movie marked for auto-download is now available with a file
-  const checkAutoDownloads = useCallback((moviesList: Movie[]) => {
-    const currentAutoIds = autoDownloadIdsRef.current;
-    if (currentAutoIds.size === 0) return;
-
-    const remainingIds = new Set(currentAutoIds);
-    let changed = false;
-
-    for (const movie of moviesList) {
-      if (remainingIds.has(movie.id) && movie.hasFile && movie.movieFile) {
-        remainingIds.delete(movie.id);
-        changed = true;
-        onAutoDownloadReadyRef.current?.(movie);
-      }
-    }
-
-    if (changed) {
-      setAutoDownloadIds(remainingIds);
-      try {
-        localStorage.setItem(
-          STORAGE_KEYS.AUTO_DOWNLOAD,
-          JSON.stringify(Array.from(remainingIds))
-        );
-      } catch {
-        // Storage write failed; ignore
-      }
+  const updateAutoDownloadIds = useCallback((update: (ids: Set<number>) => Set<number>) => {
+    const next = update(autoDownloadIdsRef.current);
+    autoDownloadIdsRef.current = next;
+    setAutoDownloadIds(next);
+    try {
+      localStorage.setItem(STORAGE_KEYS.AUTO_DOWNLOAD, JSON.stringify(Array.from(next)));
+    } catch {
+      // Storage write failed; ignore
     }
   }, []);
+
+  // Check if any movie marked for auto-download is now available with a file
+  const checkAutoDownloads = useCallback((moviesList: Movie[]) => {
+    if (autoDownloadIdsRef.current.size === 0) return;
+
+    for (const movie of moviesList) {
+      if (!autoDownloadIdsRef.current.has(movie.id) || !movie.hasFile || !movie.movieFile) continue;
+
+      // The id leaves the pending list while the download runs (no double start), and comes back
+      // if the download fails, so the next library refresh retries it.
+      updateAutoDownloadIds(ids => {
+        const next = new Set(ids);
+        next.delete(movie.id);
+        return next;
+      });
+      void Promise.resolve(onAutoDownloadReadyRef.current?.(movie))
+        .then(started => {
+          if (started === false) {
+            updateAutoDownloadIds(ids => new Set(ids).add(movie.id));
+          }
+        })
+        .catch(() => {
+          updateAutoDownloadIds(ids => new Set(ids).add(movie.id));
+        });
+    }
+  }, [updateAutoDownloadIds]);
 
   // Fetch movies from Radarr
   const loadMovies = useCallback(async (cfg?: Config) => {
@@ -123,12 +139,13 @@ export function useMovies({
     if (!baseUrl || !apiKey) return;
 
     try {
-      const allMovies = await fetchRadarrMovies(baseUrl, apiKey);
+      const allMovies = await fetchRadarrMovies();
       setMovies(allMovies);
+      setLoadError(null);
       onMoviesFetchedRef.current?.(allMovies);
       checkAutoDownloads(allMovies);
-    } catch {
-      // Fetch failed; ignore
+    } catch (e: unknown) {
+      setLoadError(readErrorMessage(e));
     }
   }, [radarrUrl, radarrKey, checkAutoDownloads]);
 
@@ -174,8 +191,9 @@ export function useMovies({
     if (!radarrUrl || !radarrKey) return false;
 
     try {
-      const queueMap = await fetchRadarrQueue(radarrUrl, radarrKey);
+      const queueMap = await fetchRadarrQueue();
       setRadarrQueue(queueMap);
+      setLoadError(null);
 
       const currentKeys = new Set(Object.keys(queueMap).map(Number));
       const hasActiveItems = currentKeys.size > 0;
@@ -193,8 +211,8 @@ export function useMovies({
         await loadMovies();
       }
       return hasActiveItems;
-    } catch {
-      // Polling failed; return false quietly
+    } catch (e: unknown) {
+      setLoadError(readErrorMessage(e));
       return false;
     }
   }, [radarrUrl, radarrKey, loadMovies]);
@@ -207,7 +225,7 @@ export function useMovies({
       setSelectedMovie(movie);
       if (radarrUrl && radarrKey) {
         try {
-          const fresh = await fetchRadarrMovie(radarrUrl, radarrKey, movie.id);
+          const fresh = await fetchRadarrMovie(movie.id);
           if (fresh?.id) {
             setSelectedMovie(prev => (prev?.id === movie.id ? fresh : prev));
             setMovies(prev => prev.map(m => (m.id === movie.id ? fresh : m)));
@@ -228,7 +246,7 @@ export function useMovies({
     if (!radarrUrl || !radarrKey) return;
 
     try {
-      const data = await apiFetchQualityProfiles(radarrUrl, radarrKey);
+      const data = await apiFetchQualityProfiles();
       setQualityProfiles(data);
       if (data.length > 0 && !selectedQuality) {
         setSelectedQuality(data[0].id);
@@ -237,6 +255,14 @@ export function useMovies({
       // Quality profiles fetch failed; ignore
     }
   }, [radarrUrl, radarrKey, selectedQuality]);
+
+  // Profiles are needed in the detail modal to change the quality of a missing movie
+  const hasSelectedMovie = selectedMovie !== null;
+  useEffect(() => {
+    if (hasSelectedMovie && qualityProfiles.length === 0) {
+      void loadQualityProfiles();
+    }
+  }, [hasSelectedMovie, qualityProfiles.length, loadQualityProfiles]);
 
   const openAddMovie = (lookupMovie: LookupMovie) => {
     setAddingMovie(lookupMovie);
@@ -260,8 +286,6 @@ export function useMovies({
 
     try {
       const createdMovie = await addRadarrMovie({
-        baseUrl: radarrUrl,
-        apiKey: radarrKey,
         rootFolder: cleanRoot,
         tmdbId: addingMovie.tmdbId,
         title: addingMovie.title,
@@ -271,7 +295,7 @@ export function useMovies({
 
       if (createdMovie?.id) {
         try {
-          await triggerRadarrMovieSearch(radarrUrl, radarrKey, createdMovie.id);
+          await triggerRadarrMovieSearch(createdMovie.id);
         } catch {
           // Ignore if search trigger fails
         }
@@ -281,18 +305,7 @@ export function useMovies({
         if (createdMovie.hasFile && createdMovie.movieFile) {
           onAutoDownloadReadyRef.current?.(createdMovie);
         } else {
-          setAutoDownloadIds(prev => {
-            const next = new Set(prev).add(createdMovie.id);
-            try {
-              localStorage.setItem(
-                STORAGE_KEYS.AUTO_DOWNLOAD,
-                JSON.stringify(Array.from(next))
-              );
-            } catch {
-              // Ignore storage write failure
-            }
-            return next;
-          });
+          updateAutoDownloadIds(ids => new Set(ids).add(createdMovie.id));
         }
       }
 
@@ -308,15 +321,33 @@ export function useMovies({
     }
   };
 
+  // Change the quality profile of a library movie, then ask Radarr to search again
+  const handleChangeMovieQuality = async (movieId: number, qualityProfileId: number) => {
+    if (!radarrUrl || !radarrKey) return false;
+
+    try {
+      const updated = await updateRadarrMovieQuality(movieId, qualityProfileId);
+      await triggerRadarrMovieSearch(movieId);
+      if (updated?.id) {
+        setSelectedMovie(prev => (prev?.id === movieId ? updated : prev));
+        setMovies(prev => prev.map(m => (m.id === movieId ? updated : m)));
+      }
+      return true;
+    } catch (e: unknown) {
+      setActionError(`Changement de qualité impossible : ${readErrorMessage(e)}`);
+      return false;
+    }
+  };
+
   const handleDeleteServerMovie = async (movieId: number) => {
     if (!radarrUrl || !radarrKey) return;
 
     try {
-      await deleteRadarrMovie(radarrUrl, radarrKey, movieId);
+      await deleteRadarrMovie(movieId);
       setSelectedMovie(null);
       await loadMovies();
-    } catch {
-      // Ignore delete failure
+    } catch (e: unknown) {
+      setActionError(`Suppression impossible : ${readErrorMessage(e)}`);
     }
   };
 
@@ -370,11 +401,11 @@ export function useMovies({
   const handleCancelQueueItem = useCallback(async (queueId: number) => {
     if (!radarrUrl || !radarrKey) return;
     try {
-      await deleteRadarrQueueItem(radarrUrl, radarrKey, queueId);
-      const queueMap = await fetchRadarrQueue(radarrUrl, radarrKey);
+      await deleteRadarrQueueItem(queueId);
+      const queueMap = await fetchRadarrQueue();
       setRadarrQueue(queueMap);
-    } catch {
-      // Ignore queue deletion failure
+    } catch (e: unknown) {
+      setActionError(`Annulation impossible : ${readErrorMessage(e)}`);
     }
   }, [radarrUrl, radarrKey]);
 
@@ -396,10 +427,14 @@ export function useMovies({
     addMovieError,
     handleAddMovie,
     handleDeleteServerMovie,
+    handleChangeMovieQuality,
     handleCancelQueueItem,
     getMovieStatus,
     findInLibrary,
     loadMovies,
     autoDownloadIds,
+    loadError,
+    actionError,
+    clearActionError: () => setActionError(null),
   };
 }

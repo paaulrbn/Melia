@@ -23,6 +23,8 @@ export const STORAGE_KEYS = {
   CONFIG: 'melia_config',
   DOWNLOADS: 'melia_downloads',
   DOWNLOAD_DIR: 'melia_download_dir',
+  DOWNLOAD_DIR_HISTORY: 'melia_download_dir_history',
+  SECRETS_MIGRATED: 'melia_secrets_migrated',
   AUTO_DOWNLOAD: 'melia_autodownload_ids',
   SERIES_AUTO_DOWNLOAD: 'melia_series_autodownload_ids',
   LAST_SEEN_VERSION: 'melia_last_seen_version',
