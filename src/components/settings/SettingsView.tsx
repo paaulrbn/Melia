@@ -1,9 +1,8 @@
-import { useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { AppInfo, Config, ConfigField } from '../../types';
 import { RADARR_CONFIG_FIELDS, SONARR_CONFIG_FIELDS, STREAMING_CONFIG_FIELDS } from '../../utils/constants';
-import { Check, Eye, EyeOff } from 'lucide-react';
-import { Button, IconButton, Input } from '../ui';
+import { Check } from 'lucide-react';
+import { Button, Input } from '../ui';
 
 interface SettingsViewProps {
   readonly downloadDir: string;
@@ -62,15 +61,12 @@ interface ConfigFieldInputProps {
   readonly onChange: (value: string) => void;
 }
 
-/** Input of a config field. Secrets stay masked while typing, with a button to reveal them on demand. */
+/** Input of a config field. Secrets are always masked and can never be revealed from the interface. */
 function ConfigFieldInput({ field, value, onChange }: Readonly<ConfigFieldInputProps>) {
-  const [revealed, setRevealed] = useState(false);
-  const secret = isSecretField(field);
-
   return (
     <Input
       id={`config-input-${field.key}`}
-      type={secret && !revealed ? 'password' : 'text'}
+      type={isSecretField(field) ? 'password' : 'text'}
       inputSize="sm"
       fullWidth
       autoComplete="off"
@@ -78,18 +74,6 @@ function ConfigFieldInput({ field, value, onChange }: Readonly<ConfigFieldInputP
       placeholder={field.placeholder}
       value={value}
       onChange={e => onChange(e.target.value)}
-      rightElement={
-        secret ? (
-          <IconButton
-            icon={revealed ? <EyeOff size={16} /> : <Eye size={16} />}
-            onClick={() => setRevealed(prev => !prev)}
-            aria-label={revealed ? 'Masquer la valeur' : 'Afficher la valeur'}
-            size="sm"
-            shape="circle"
-            variant="ghost"
-          />
-        ) : undefined
-      }
     />
   );
 }
