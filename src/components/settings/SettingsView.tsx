@@ -1,8 +1,9 @@
+import { useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { AppInfo, Config, ConfigField } from '../../types';
 import { RADARR_CONFIG_FIELDS, SONARR_CONFIG_FIELDS, STREAMING_CONFIG_FIELDS } from '../../utils/constants';
-import { Check } from 'lucide-react';
-import { Button, Input } from '../ui';
+import { Check, Eye, EyeOff } from 'lucide-react';
+import { Button, IconButton, Input } from '../ui';
 
 interface SettingsViewProps {
   readonly downloadDir: string;
@@ -26,6 +27,21 @@ interface SettingsViewProps {
   readonly onSaveConfig: () => void;
 }
 
+function isSecretField(field: ConfigField): boolean {
+  return (
+    field.type === 'password' ||
+    field.key === 'MEDIA_SERVER_PASSWORD' ||
+    field.key === 'RADARR_API_KEY' ||
+    field.key === 'SONARR_API_KEY'
+  );
+}
+
+/** Tooltip with the full value, never for secrets (the native tooltip would reveal them on hover). */
+function configValueTitle(field: ConfigField, value?: string): string | undefined {
+  if (!value || isSecretField(field)) return undefined;
+  return value;
+}
+
 function formatConfigValue(field: ConfigField, value?: string): string {
   if (!value) return '—';
   if (field.type === 'password' || field.key === 'MEDIA_SERVER_PASSWORD') {
@@ -38,6 +54,44 @@ function formatConfigValue(field: ConfigField, value?: string): string {
     return '••••••••';
   }
   return value;
+}
+
+interface ConfigFieldInputProps {
+  readonly field: ConfigField;
+  readonly value: string;
+  readonly onChange: (value: string) => void;
+}
+
+/** Input of a config field. Secrets stay masked while typing, with a button to reveal them on demand. */
+function ConfigFieldInput({ field, value, onChange }: Readonly<ConfigFieldInputProps>) {
+  const [revealed, setRevealed] = useState(false);
+  const secret = isSecretField(field);
+
+  return (
+    <Input
+      id={`config-input-${field.key}`}
+      type={secret && !revealed ? 'password' : 'text'}
+      inputSize="sm"
+      fullWidth
+      autoComplete="off"
+      spellCheck={false}
+      placeholder={field.placeholder}
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      rightElement={
+        secret ? (
+          <IconButton
+            icon={revealed ? <EyeOff size={16} /> : <Eye size={16} />}
+            onClick={() => setRevealed(prev => !prev)}
+            aria-label={revealed ? 'Masquer la valeur' : 'Afficher la valeur'}
+            size="sm"
+            shape="circle"
+            variant="ghost"
+          />
+        ) : undefined
+      }
+    />
+  );
 }
 
 export function SettingsView({
@@ -170,16 +224,10 @@ export function SettingsView({
                   <label htmlFor={`config-input-${field.key}`} className="config-label">
                     {field.label}
                   </label>
-                  <Input
-                    id={`config-input-${field.key}`}
-                    type={field.type || 'text'}
-                    inputSize="sm"
-                    fullWidth
-                    placeholder={field.placeholder}
+                  <ConfigFieldInput
+                    field={field}
                     value={editingConfig[field.key] || ''}
-                    onChange={e =>
-                      setEditingConfig(prev => ({ ...prev, [field.key]: e.target.value }))
-                    }
+                    onChange={value => setEditingConfig(prev => ({ ...prev, [field.key]: value }))}
                   />
                 </div>
               ))}
@@ -189,7 +237,7 @@ export function SettingsView({
               {RADARR_CONFIG_FIELDS.map(field => (
                 <div key={field.key} className="config-row">
                   <div className="config-label">{field.label}</div>
-                  <div className="config-value" title={config[field.key] || undefined}>
+                  <div className="config-value" title={configValueTitle(field, config[field.key])}>
                     {formatConfigValue(field, config[field.key])}
                   </div>
                 </div>
@@ -210,16 +258,10 @@ export function SettingsView({
                   <label htmlFor={`config-input-${field.key}`} className="config-label">
                     {field.label}
                   </label>
-                  <Input
-                    id={`config-input-${field.key}`}
-                    type={field.type || 'text'}
-                    inputSize="sm"
-                    fullWidth
-                    placeholder={field.placeholder}
+                  <ConfigFieldInput
+                    field={field}
                     value={editingConfig[field.key] || ''}
-                    onChange={e =>
-                      setEditingConfig(prev => ({ ...prev, [field.key]: e.target.value }))
-                    }
+                    onChange={value => setEditingConfig(prev => ({ ...prev, [field.key]: value }))}
                   />
                 </div>
               ))}
@@ -229,7 +271,7 @@ export function SettingsView({
               {SONARR_CONFIG_FIELDS.map(field => (
                 <div key={field.key} className="config-row">
                   <div className="config-label">{field.label}</div>
-                  <div className="config-value" title={config[field.key] || undefined}>
+                  <div className="config-value" title={configValueTitle(field, config[field.key])}>
                     {formatConfigValue(field, config[field.key])}
                   </div>
                 </div>
@@ -250,16 +292,10 @@ export function SettingsView({
                   <label htmlFor={`config-input-${field.key}`} className="config-label">
                     {field.label}
                   </label>
-                  <Input
-                    id={`config-input-${field.key}`}
-                    type={field.type || 'text'}
-                    inputSize="sm"
-                    fullWidth
-                    placeholder={field.placeholder}
+                  <ConfigFieldInput
+                    field={field}
                     value={editingConfig[field.key] || ''}
-                    onChange={e =>
-                      setEditingConfig(prev => ({ ...prev, [field.key]: e.target.value }))
-                    }
+                    onChange={value => setEditingConfig(prev => ({ ...prev, [field.key]: value }))}
                   />
                 </div>
               ))}
@@ -269,7 +305,7 @@ export function SettingsView({
               {STREAMING_CONFIG_FIELDS.map(field => (
                 <div key={field.key} className="config-row">
                   <div className="config-label">{field.label}</div>
-                  <div className="config-value" title={config[field.key] || undefined}>
+                  <div className="config-value" title={configValueTitle(field, config[field.key])}>
                     {formatConfigValue(field, config[field.key])}
                   </div>
                 </div>
