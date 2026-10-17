@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import type { KeyboardEvent } from 'react';
 import { DownloadInfo, Movie, Series, UnifiedQueueItem } from '../../types';
 import { formatSize } from '../../utils/formatters';
 import { getImageUrl } from '../../utils/media';
@@ -275,6 +276,14 @@ export function DownloadsView({
                     if (movie && onSelectMovie) onSelectMovie(movie);
                   };
 
+                  const handleServerMovieKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+                    if (e.target !== e.currentTarget) return;
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleServerMovieClick();
+                    }
+                  };
+
                   const posterEl = posterUrl ? (
                     <img src={posterUrl} alt="" className="dl-poster" />
                   ) : (
@@ -286,35 +295,20 @@ export function DownloadsView({
                   return (
                     <div
                       key={queueItem.id}
-                      className="download-item"
+                      className={`download-item ${isClickable ? 'is-clickable' : ''}`.trim()}
+                      {...(isClickable && {
+                        role: 'button',
+                        tabIndex: 0,
+                        onClick: handleServerMovieClick,
+                        onKeyDown: handleServerMovieKeyDown,
+                        title: 'Cliquer pour voir les détails',
+                      })}
                     >
-                      {isClickable ? (
-                        <button
-                          type="button"
-                          className="dl-poster-btn"
-                          onClick={handleServerMovieClick}
-                          title="Cliquer pour voir les détails"
-                        >
-                          {posterEl}
-                        </button>
-                      ) : (
-                        posterEl
-                      )}
+                      {posterEl}
 
                       <div className="dl-main">
                         <div className="dl-header-row">
-                          {isClickable ? (
-                            <button
-                              type="button"
-                              className="dl-title-btn"
-                              onClick={handleServerMovieClick}
-                              title="Cliquer pour voir les détails"
-                            >
-                              <h4 title={title}>{title}</h4>
-                            </button>
-                          ) : (
-                            <h4 title={title}>{title}</h4>
-                          )}
+                          <h4 title={title}>{title}</h4>
                           <div className="dl-actions">
                             <span className="dl-percentage dl-percentage--server">{progress}%</span>
                             {onCancelServerQueue && (

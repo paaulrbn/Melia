@@ -190,20 +190,25 @@ function App() {
   const searchManager = useSearch(configManager.config);
 
   const unifiedServerQueue = useMemo<UnifiedQueueItem[]>(() => {
-    const movieItems: UnifiedQueueItem[] = Object.values(moviesManager.radarrQueue).map(q => ({
-      id: `radarr-${q.id || q.movieId}`,
-      mediaType: 'movie',
-      mediaId: q.movieId,
-      title: q.movie ? `${q.movie.title} (${q.movie.year})` : q.title || 'Film',
-      size: q.size,
-      sizeleft: q.sizeleft,
-      timeleft: q.timeleft,
-      status: q.status,
-      trackedDownloadStatus: q.trackedDownloadStatus,
-      queueId: q.id,
-    }));
+    // Radarr's queue only carries the release name ("Film (2014) (2160p BluRay ...)") unless the movie is
+    // included: the real title comes from the queue record, then from the library.
+    const movieItems: UnifiedQueueItem[] = Object.values(moviesManager.radarrQueue).map(q => {
+      const knownMovie = q.movie ?? moviesManager.movies.find(m => m.id === q.movieId);
+      return {
+        id: `radarr-${q.id || q.movieId}`,
+        mediaType: 'movie',
+        mediaId: q.movieId,
+        title: knownMovie?.title ?? q.title ?? 'Film',
+        size: q.size,
+        sizeleft: q.sizeleft,
+        timeleft: q.timeleft,
+        status: q.status,
+        trackedDownloadStatus: q.trackedDownloadStatus,
+        queueId: q.id,
+      };
+    });
     return [...movieItems, ...seriesManager.sonarrQueue];
-  }, [moviesManager.radarrQueue, seriesManager.sonarrQueue]);
+  }, [moviesManager.radarrQueue, moviesManager.movies, seriesManager.sonarrQueue]);
 
   const handleCancelServerQueueItem = useCallback(
     async (item: UnifiedQueueItem) => {
