@@ -1,43 +1,52 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use tauri::Manager;
+
 mod commands;
 use commands::*;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let http_client = build_client();
+    let runtime = RuntimeState::default();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_deep_link::init())
-        .setup(|_app| {
-            #[cfg(any(windows, target_os = "linux"))]
-            {
-                use tauri_plugin_deep_link::DeepLinkExt;
-                let _ = _app.deep_link().register_all();
+        .setup({
+            let http_client = http_client.clone();
+            let runtime = runtime.clone();
+            move |app| {
+                #[cfg(any(windows, target_os = "linux"))]
+                {
+                    use tauri_plugin_deep_link::DeepLinkExt;
+                    let _ = app.deep_link().register_all();
+                }
+                let player_proxy = proxy::start(http_client, runtime)?;
+                app.manage(player_proxy);
+                Ok(())
             }
-            Ok(())
         })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(DownloadState(Arc::new(Mutex::new(HashMap::new()))))
+        .manage(HttpState(http_client))
+        .manage(runtime)
         .invoke_handler(tauri::generate_handler![
             play_video,
             download_video,
             get_config,
-            fetch_radarr_movies,
-            search_radarr_movies,
-            get_radarr_quality_profiles,
-            add_radarr_movie,
-            delete_radarr_movie,
-            fetch_sonarr_series,
-            search_sonarr_series,
-            get_sonarr_quality_profiles,
-            get_sonarr_root_folders,
-            get_sonarr_episodes,
-            get_sonarr_episode_files,
-            add_sonarr_series,
-            delete_sonarr_series,
+            get_secrets,
+            set_secrets,
+            read_legacy_secrets,
+            delete_legacy_secrets,
+            set_api_config,
+            set_download_dir,
+            radarr_request,
+            sonarr_request,
             cancel_download,
             get_download_path,
+            stat_downloads,
             check_update,
             install_update,
             get_app_info,

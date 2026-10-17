@@ -1,15 +1,24 @@
 pub mod config;
 pub mod download;
+pub mod http;
+pub mod paths;
 pub mod player;
+pub mod proxy;
 pub mod radarr;
+pub mod secrets;
+pub mod settings;
 pub mod sonarr;
 pub mod system;
 pub mod updater;
 
 pub use config::*;
 pub use download::*;
+pub use http::*;
+pub use paths::*;
 pub use player::*;
 pub use radarr::*;
+pub use secrets::*;
+pub use settings::*;
 pub use sonarr::*;
 pub use system::*;
 pub use updater::*;
