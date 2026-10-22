@@ -137,7 +137,7 @@ export function SettingsView({
           <div className="settings-item-info">
             <span className="config-label">Version installée</span>
             <span className="config-value-highlight">
-              v{appInfo?.version || '0.3.4'} {updateVersion ? `(v${updateVersion} disponible)` : ''}
+              v{appInfo?.version || '0.3.5'} {updateVersion ? `(v${updateVersion} disponible)` : ''}
             </span>
             {updateStatusText && (
               <span className="settings-status-text">{updateStatusText}</span>
