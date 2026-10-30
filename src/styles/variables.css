@@ -1,20 +1,23 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
-
 /* ==========================================================================
    Design Tokens & CSS Variables
    ========================================================================== */
 :root {
   /* Colors & Surfaces */
-  --bg-base: #050505;
+  --bg-base: #0a0a0a;
   --bg-surface: rgba(10, 10, 10, 0.7);
-  --bg-surface-solid: #0c0c0c;
+  --bg-surface-solid: #141414; /* Modals: lighter than the cards they cover */
+  --surface-1: #111111;   /* Cards */
+  --surface-2: #1a1a1a;   /* Fields, lists */
+  --surface-3: #242424;   /* Hover */
+  --surface-4: #2e2e2e;   /* Strong hover */
+  --border-strong: #5e5e5e; /* Field outlines, 3:1 on the background */
   --text-primary: rgba(255, 255, 255, 0.95);
-  --text-secondary: rgba(255, 255, 255, 0.85);
+  --text-secondary: rgba(255, 255, 255, 0.7);
   --text-tertiary: rgba(255, 255, 255, 0.45);
   --accent-primary: #E50914; /* Cinematic Red */
-  --accent-glow: rgba(229, 9, 20, 0.4);
+  --accent-text: #ff3b44;    /* Red for small text, 4.5:1 on the background */
+  --danger: #ff4d4f;         /* Errors and destructive actions */
   --accent-server: #0071eb;
-  --accent-server-glow: rgba(0, 113, 235, 0.4);
 
   /* Status Colors */
   --status-local: #22c55e;
@@ -22,11 +25,12 @@
   --status-unavailable: #6b7280;
 
   /* Typography: Outfit in Sentence Case / Title Case */
-  --font-heading: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-body: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-display: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-heading: 'Outfit Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-body: 'Outfit Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Outfit Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
   /* Modular Scale (Major Third 1.250) */
+  --text-2xs: 0.75rem;    /* 12px - badges, micro labels */
   --text-xs: 0.8125rem;   /* 13px */
   --text-sm: 0.875rem;    /* 14px */
   --text-base: 1rem;      /* 16px */
@@ -47,6 +51,10 @@
 
   /* Layout & Effects */
   --glass-blur: blur(24px);
-  --transition-smooth: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  --header-height: 62px;
+  --duration-fast: 200ms;   /* Colour, opacity */
+  --duration-base: 400ms;   /* Hover, small moves */
+  --duration-slow: 400ms;   /* Larger moves, panels */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-smooth: all var(--duration-base) var(--ease-out);
+  --header-height: 56px;
 }
