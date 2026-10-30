@@ -1,7 +1,9 @@
 import { DownloadInfo, LookupMovie, Movie, QueueRecord } from '../../types';
-import { Search, X } from 'lucide-react';
-import { Input, IconButton } from '../ui';
+import { Search, Settings, X } from 'lucide-react';
+import { Button, Input, IconButton } from '../ui';
 import { MovieCard } from './MovieCard';
+
+const SKELETON_CARDS = 10;
 
 interface MoviesViewProps {
   readonly searchQuery: string;
@@ -17,6 +19,11 @@ interface MoviesViewProps {
   readonly findInLibrary: (tmdbId: number) => Movie | undefined;
   readonly onSelectMovie: (movie: Movie) => void;
   readonly onOpenAddMovie: (lookupMovie: LookupMovie) => void;
+  readonly isConfigLoaded: boolean;
+  readonly isConfigured: boolean;
+  readonly hasLoaded: boolean;
+  readonly hasLoadError: boolean;
+  readonly onOpenSettings: () => void;
 }
 
 export function MoviesView({
@@ -33,6 +40,11 @@ export function MoviesView({
   findInLibrary,
   onSelectMovie,
   onOpenAddMovie,
+  isConfigLoaded,
+  isConfigured,
+  hasLoaded,
+  hasLoadError,
+  onOpenSettings,
 }: Readonly<MoviesViewProps>) {
   const isSearchActive = searchQuery.trim().length > 0;
 
@@ -40,14 +52,14 @@ export function MoviesView({
     if (isSearching) {
       return (
         <div className="loading-state">
-          <p>Recherche en cours...</p>
+          <p>Recherche en cours…</p>
         </div>
       );
     }
     if (searchResults.length === 0) {
       return (
         <div className="loading-state">
-          <p>Aucun résultat pour "{searchQuery}"</p>
+          <p>Aucun résultat pour «&nbsp;{searchQuery}&nbsp;»</p>
         </div>
       );
     }
@@ -75,10 +87,31 @@ export function MoviesView({
   };
 
   const renderLibraryContent = () => {
-    if (movies.length === 0) {
+    if (isConfigLoaded && !isConfigured) {
       return (
-        <div className="loading-state">
-          <p>Chargement de la bibliothèque ou serveur non configuré...</p>
+        <div className="empty-state">
+          <p>Radarr n'est pas configuré.</p>
+          <Button variant="secondary" leftIcon={<Settings size={16} />} onClick={onOpenSettings}>
+            Ouvrir les paramètres
+          </Button>
+        </div>
+      );
+    }
+    if (movies.length === 0) {
+      // The StatusBanner above already explains a failed load
+      if (hasLoadError) return null;
+      if (!hasLoaded) {
+        return (
+          <div className="movie-grid" role="status" aria-label="Chargement de la bibliothèque…">
+            {Array.from({ length: SKELETON_CARDS }, (_, i) => (
+              <div key={i} className="movie-skeleton" aria-hidden="true" />
+            ))}
+          </div>
+        );
+      }
+      return (
+        <div className="empty-state">
+          <p>Aucun film dans la bibliothèque. Recherchez un film pour l'ajouter.</p>
         </div>
       );
     }
@@ -128,7 +161,7 @@ export function MoviesView({
         <Input
           type="text"
           inputSize="lg"
-          placeholder="Rechercher un film..."
+          placeholder="Rechercher un film…"
           value={searchQuery}
           onChange={e => onSearchChange(e.target.value)}
           leftIcon={<Search size={18} />}

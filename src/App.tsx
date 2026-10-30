@@ -300,6 +300,11 @@ function App() {
             findInLibrary={moviesManager.findInLibrary}
             onSelectMovie={moviesManager.selectMovie}
             onOpenAddMovie={moviesManager.openAddMovie}
+            isConfigLoaded={configManager.configLoaded}
+            isConfigured={moviesManager.isConfigured}
+            hasLoaded={moviesManager.hasLoaded}
+            hasLoadError={Boolean(moviesManager.loadError)}
+            onOpenSettings={() => setActiveTab('settings')}
           />
         </div>
 
@@ -319,6 +324,11 @@ function App() {
             findInLibrary={seriesManager.findInLibrary}
             onSelectSeries={seriesManager.selectSeries}
             onOpenAddSeries={seriesManager.openAddSeries}
+            isConfigLoaded={configManager.configLoaded}
+            isConfigured={seriesManager.isConfigured}
+            hasLoaded={seriesManager.hasLoaded}
+            hasLoadError={Boolean(seriesManager.loadError)}
+            onOpenSettings={() => setActiveTab('settings')}
           />
         </div>
 

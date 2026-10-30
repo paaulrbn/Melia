@@ -44,7 +44,7 @@ export function useUpdater() {
       const res = await checkUpdate();
       if (res.available && res.latest_version) {
         setUpdateVersion(res.latest_version);
-        setUpdateStatusText(`Mise à jour v${res.latest_version} disponible !`);
+        setUpdateStatusText(`Mise à jour v${res.latest_version} disponible`);
       } else if (res.error) {
         setUpdateStatusText(`Erreur : ${res.error}`);
       } else {

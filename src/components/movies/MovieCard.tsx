@@ -1,6 +1,6 @@
 import { DownloadInfo, LookupMovie, Movie, QueueRecord } from '../../types';
 import { getImageUrl } from '../../utils/media';
-import { Play, Plus } from 'lucide-react';
+import { CircleAlert, Play, Plus } from 'lucide-react';
 import { ProgressBar } from '../ui';
 
 interface MovieCardProps {
@@ -41,7 +41,19 @@ export function MovieCard({
       onClick={onClick}
     >
       {posterUrl && <img src={posterUrl} alt={movie.title} loading="lazy" />}
-      {isMissing && <span className="movie-missing-band" title="Film manquant sur le serveur" />}
+      {isMissing && (
+        <>
+          <span className="movie-missing-band" aria-hidden="true" />
+          <span
+            className="movie-missing-icon"
+            role="img"
+            aria-label="Film manquant sur le serveur"
+            title="Film manquant sur le serveur"
+          >
+            <CircleAlert size={14} aria-hidden="true" />
+          </span>
+        </>
+      )}
       <div className="movie-overlay">
         <h3>{movie.title}</h3>
         <span className="year">{movie.year}</span>
@@ -58,7 +70,7 @@ export function MovieCard({
             value={download.progress}
             isPaused={download.status === 'paused'}
             size="xs"
-            style={{ marginTop: '10px' }}
+            style={{ marginTop: '8px' }}
           />
         )}
 
@@ -75,7 +87,7 @@ export function MovieCard({
               value={serverProgress}
               variant="server"
               size="xs"
-              style={{ marginTop: '10px' }}
+              style={{ marginTop: '8px' }}
             />
             <div className="mini-status">
               En cours : {queueItem.timeleft || `${serverProgress}%`}

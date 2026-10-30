@@ -595,14 +595,14 @@ export function SeriesDetailModal({
     if (isLoadingEpisodes && episodes.length === 0) {
       return (
         <div className="loading-state" style={{ padding: '30px 0' }}>
-          <p>Chargement des épisodes...</p>
+          <p>Chargement des épisodes…</p>
         </div>
       );
     }
 
     if (currentSeasonEpisodes.length === 0) {
       return (
-        <div className="loading-state" style={{ padding: '30px 0' }}>
+        <div className="empty-state empty-state--panel">
           <p>Aucun épisode répertorié pour cette saison</p>
         </div>
       );

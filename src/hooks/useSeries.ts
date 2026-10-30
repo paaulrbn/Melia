@@ -88,6 +88,8 @@ export function useSeries({ config, downloads }: UseSeriesProps) {
   const [series, setSeries] = useState<Series[]>([]);
   const [selectedSeries, setSelectedSeries] = useState<Series | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Tells an empty library apart from one that is still loading
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
   // Lazy-loaded episodes cache: seriesId -> Episode[]
@@ -117,6 +119,7 @@ export function useSeries({ config, downloads }: UseSeriesProps) {
     try {
       const data = await fetchSonarrSeries();
       setSeries(data);
+      setHasLoaded(true);
       setLoadError(null);
     } catch (e: unknown) {
       setLoadError(readErrorMessage(e));
@@ -440,6 +443,8 @@ export function useSeries({ config, downloads }: UseSeriesProps) {
     findInLibrary,
     loadSeries,
     loadSeriesEpisodes,
+    isConfigured: Boolean(sonarrUrl && sonarrKey),
+    hasLoaded,
     loadError,
     actionError,
     clearActionError: () => setActionError(null),

@@ -40,7 +40,7 @@ export function ConfirmModal({
     >
       <div className="confirm-modal-body">
         <div className={`confirm-modal-icon-wrapper confirm-modal-icon-wrapper--${variant}`}>
-          {icon || (variant === 'danger' ? <Trash2 size={22} /> : <AlertTriangle size={22} />)}
+          {icon || (variant === 'danger' ? <Trash2 size={20} /> : <AlertTriangle size={20} />)}
         </div>
         <div className="confirm-modal-text">
           <h3 className="confirm-modal-title">{title}</h3>

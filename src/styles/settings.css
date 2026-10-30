@@ -64,7 +64,6 @@
   align-items: center;
   margin-top: var(--space-lg);
   margin-bottom: var(--space-xs);
-  padding: 0 var(--space-micro);
 }
 
 .settings-section-title h3 {
@@ -134,8 +133,12 @@
 
 .settings-status-text {
   font-size: var(--text-xs);
-  color: var(--accent-primary);
+  color: var(--text-secondary);
   margin-top: var(--space-micro);
+}
+
+.settings-status-text--error {
+  color: var(--danger);
 }
 
 .settings-saved-text {

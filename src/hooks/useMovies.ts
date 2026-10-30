@@ -54,6 +54,8 @@ export function useMovies({
   const [movies, setMovies] = useState<Movie[]>([]);
   const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Tells an empty library apart from one that is still loading
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
   // Keep a ref to onMoviesFetched to avoid effect re-runs on render
@@ -141,6 +143,7 @@ export function useMovies({
     try {
       const allMovies = await fetchRadarrMovies();
       setMovies(allMovies);
+      setHasLoaded(true);
       setLoadError(null);
       onMoviesFetchedRef.current?.(allMovies);
       checkAutoDownloads(allMovies);
@@ -433,6 +436,8 @@ export function useMovies({
     findInLibrary,
     loadMovies,
     autoDownloadIds,
+    isConfigured: Boolean(radarrUrl && radarrKey),
+    hasLoaded,
     loadError,
     actionError,
     clearActionError: () => setActionError(null),

@@ -26,6 +26,8 @@ export function useConfig() {
   const [configPayload, setConfigPayload] = useState<string | null>(null);
   const [configPassword, setConfigPassword] = useState('');
   const [configError, setConfigError] = useState<string | null>(null);
+  // False until the saved settings (keychain included) have been read once
+  const [configLoaded, setConfigLoaded] = useState(false);
 
   const handleDeepLink = useCallback((urls: string[]) => {
     for (const urlStr of urls) {
@@ -89,6 +91,7 @@ export function useConfig() {
 
     setConfig(conf);
     setEditingConfig(conf);
+    setConfigLoaded(true);
   }, []);
 
   useEffect(() => {
@@ -145,6 +148,7 @@ export function useConfig() {
 
   return {
     config,
+    configLoaded,
     editingConfig,
     setEditingConfig,
     isEditingConfig,

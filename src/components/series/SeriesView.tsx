@@ -1,8 +1,10 @@
 import { useMemo } from 'react';
 import { DownloadInfo, LookupSeries, Series, UnifiedQueueItem } from '../../types';
-import { Search, X } from 'lucide-react';
-import { Input, IconButton } from '../ui';
+import { Search, Settings, X } from 'lucide-react';
+import { Button, Input, IconButton } from '../ui';
 import { SeriesCard } from './SeriesCard';
+
+const SKELETON_CARDS = 10;
 
 interface SeriesViewProps {
   readonly searchQuery: string;
@@ -19,6 +21,11 @@ interface SeriesViewProps {
   readonly findInLibrary: (tvdbId: number) => Series | undefined;
   readonly onSelectSeries: (series: Series) => void;
   readonly onOpenAddSeries: (lookupSeries: LookupSeries) => void;
+  readonly isConfigLoaded: boolean;
+  readonly isConfigured: boolean;
+  readonly hasLoaded: boolean;
+  readonly hasLoadError: boolean;
+  readonly onOpenSettings: () => void;
 }
 
 export function SeriesView({
@@ -36,6 +43,11 @@ export function SeriesView({
   findInLibrary,
   onSelectSeries,
   onOpenAddSeries,
+  isConfigLoaded,
+  isConfigured,
+  hasLoaded,
+  hasLoadError,
+  onOpenSettings,
 }: Readonly<SeriesViewProps>) {
   const isSearchActive = searchQuery.trim().length > 0;
 
@@ -67,14 +79,14 @@ export function SeriesView({
     if (isSearching) {
       return (
         <div className="loading-state">
-          <p>Recherche en cours...</p>
+          <p>Recherche en cours…</p>
         </div>
       );
     }
     if (searchResults.length === 0) {
       return (
         <div className="loading-state">
-          <p>Aucun résultat pour "{searchQuery}"</p>
+          <p>Aucun résultat pour «&nbsp;{searchQuery}&nbsp;»</p>
         </div>
       );
     }
@@ -102,10 +114,31 @@ export function SeriesView({
   };
 
   const renderLibraryContent = () => {
-    if (series.length === 0) {
+    if (isConfigLoaded && !isConfigured) {
       return (
-        <div className="loading-state">
-          <p>Chargement de la bibliothèque ou serveur non configuré...</p>
+        <div className="empty-state">
+          <p>Sonarr n'est pas configuré.</p>
+          <Button variant="secondary" leftIcon={<Settings size={16} />} onClick={onOpenSettings}>
+            Ouvrir les paramètres
+          </Button>
+        </div>
+      );
+    }
+    if (series.length === 0) {
+      // The StatusBanner above already explains a failed load
+      if (hasLoadError) return null;
+      if (!hasLoaded) {
+        return (
+          <div className="movie-grid" role="status" aria-label="Chargement de la bibliothèque…">
+            {Array.from({ length: SKELETON_CARDS }, (_, i) => (
+              <div key={i} className="movie-skeleton" aria-hidden="true" />
+            ))}
+          </div>
+        );
+      }
+      return (
+        <div className="empty-state">
+          <p>Aucune série dans la bibliothèque. Recherchez une série pour l'ajouter.</p>
         </div>
       );
     }
@@ -173,7 +206,7 @@ export function SeriesView({
         <Input
           type="text"
           inputSize="lg"
-          placeholder="Rechercher une série..."
+          placeholder="Rechercher une série…"
           value={searchQuery}
           onChange={e => onSearchChange(e.target.value)}
           leftIcon={<Search size={18} />}

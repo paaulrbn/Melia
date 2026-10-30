@@ -13,11 +13,11 @@
   flex-direction: column;
   position: relative;
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.08);
-  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: slideUp var(--duration-slow) var(--ease-out);
 }
 
 .changelog-header {
-  padding: 32px 32px 14px 32px;
+  padding: var(--space-xl) var(--space-xl) var(--space-md) var(--space-xl);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -26,7 +26,7 @@
 
 .changelog-title {
   font-family: var(--font-heading), sans-serif;
-  font-size: 1.5rem;
+  font-size: var(--text-xl);
   font-weight: 700;
   color: var(--text-primary);
   letter-spacing: -0.4px;
@@ -43,13 +43,13 @@
 }
 
 .changelog-body {
-  padding: 10px 32px 20px 32px;
+  padding: var(--space-xs) var(--space-xl) var(--space-lg) var(--space-xl);
   overflow-y: auto;
   flex: 1;
   max-height: 50vh;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--space-lg);
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
 }
@@ -71,7 +71,7 @@
 
 .changelog-group-title {
   font-family: var(--font-heading), sans-serif;
-  font-size: 0.92rem;
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text-primary);
   letter-spacing: -0.2px;
@@ -84,16 +84,16 @@
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-micro);
 }
 
 .changelog-list-item {
   font-family: var(--font-body), sans-serif;
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
   line-height: 1.45;
   position: relative;
-  padding-left: 14px;
+  padding-left: var(--space-md);
 }
 
 .changelog-list-item::before {

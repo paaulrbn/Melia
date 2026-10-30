@@ -73,7 +73,7 @@ export function SeriesCard({
               value={serverProgress}
               variant="server"
               size="xs"
-              style={{ marginTop: '10px' }}
+              style={{ marginTop: '8px' }}
             />
             <div className="mini-status">
               En cours : {activeQueue.timeleft || `${serverProgress}%`}
