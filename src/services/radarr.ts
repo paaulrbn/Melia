@@ -59,9 +59,14 @@ export async function addRadarrMovie(params: AddMovieParams): Promise<Movie> {
 }
 
 export async function updateRadarrMovieQuality(movieId: number, qualityProfileId: number): Promise<Movie> {
-  // Radarr PUT expects the full movie object: fetch it, change the profile, send it back
+  // Radarr PUT expects the full movie object: fetch it, change the profile, send it back.
+  // Also monitor it again, so Radarr keeps searching after this one-off search.
   const current = JSON.parse(await radarrRequest('GET', `/api/v3/movie/${movieId}`));
-  const updated = await radarrRequest('PUT', `/api/v3/movie/${movieId}`, { ...current, qualityProfileId });
+  const updated = await radarrRequest('PUT', `/api/v3/movie/${movieId}`, {
+    ...current,
+    qualityProfileId,
+    monitored: true,
+  });
   return JSON.parse(updated);
 }
 
