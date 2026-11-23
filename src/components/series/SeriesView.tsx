@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { DownloadInfo, LookupSeries, Series, UnifiedQueueItem } from '../../types';
-import { Search, Settings, X } from 'lucide-react';
-import { Button, Input, IconButton } from '../ui';
+import { Settings } from 'lucide-react';
+import { Button } from '../ui';
 import { SeriesCard } from './SeriesCard';
 
 const SKELETON_CARDS = 10;
@@ -10,8 +10,6 @@ interface SeriesViewProps {
   readonly searchQuery: string;
   readonly searchResults: LookupSeries[];
   readonly isSearching: boolean;
-  readonly onSearchChange: (term: string) => void;
-  readonly onClearSearch: () => void;
   readonly series: Series[];
   readonly localSeries: Series[];
   readonly serverSeries: Series[];
@@ -32,8 +30,6 @@ export function SeriesView({
   searchQuery,
   searchResults,
   isSearching,
-  onSearchChange,
-  onClearSearch,
   series,
   localSeries,
   serverSeries,
@@ -197,37 +193,6 @@ export function SeriesView({
     );
   };
 
-  return (
-    <div>
-      <h2>Séries</h2>
-
-      {/* Search bar */}
-      <div className="search-bar">
-        <Input
-          type="text"
-          inputSize="lg"
-          placeholder="Rechercher une série…"
-          value={searchQuery}
-          onChange={e => onSearchChange(e.target.value)}
-          leftIcon={<Search size={18} />}
-          rightElement={
-            searchQuery ? (
-              <IconButton
-                icon={<X size={16} />}
-                onClick={onClearSearch}
-                aria-label="Effacer la recherche"
-                size="sm"
-                shape="circle"
-                variant="ghost"
-                className="search-clear"
-              />
-            ) : undefined
-          }
-        />
-      </div>
-
-      {/* Content */}
-      {isSearchActive ? renderSearchContent() : renderLibraryContent()}
-    </div>
-  );
+  // Title and search field live in the top row (PageToolbar)
+  return <div>{isSearchActive ? renderSearchContent() : renderLibraryContent()}</div>;
 }

@@ -245,8 +245,6 @@ export function DownloadsView({
 
   return (
     <div className="downloads-view">
-      <h2>Gestionnaire de téléchargements</h2>
-
       {isEmpty ? (
         <p className="loading-state">Aucun téléchargement en cours.</p>
       ) : (

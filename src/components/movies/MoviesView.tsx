@@ -1,6 +1,7 @@
 import { DownloadInfo, LookupMovie, Movie, QueueRecord } from '../../types';
-import { Search, Settings, X } from 'lucide-react';
-import { Button, Input, IconButton } from '../ui';
+import { Settings } from 'lucide-react';
+import { Button } from '../ui';
+import { MovieGroup, movieGroupHeadingId, movieGroupSectionId } from '../../utils/movieGroups';
 import { MovieCard } from './MovieCard';
 
 const SKELETON_CARDS = 10;
@@ -9,15 +10,13 @@ interface MoviesViewProps {
   readonly searchQuery: string;
   readonly searchResults: LookupMovie[];
   readonly isSearching: boolean;
-  readonly onSearchChange: (term: string) => void;
-  readonly onClearSearch: () => void;
   readonly movies: Movie[];
-  readonly localMovies: Movie[];
-  readonly serverMovies: Movie[];
+  readonly movieGroups: MovieGroup[];
   readonly downloads: Record<string, DownloadInfo>;
   readonly radarrQueue: Record<number, QueueRecord>;
   readonly findInLibrary: (tmdbId: number) => Movie | undefined;
-  readonly onSelectMovie: (movie: Movie) => void;
+  /** Opens the detail page; `trigger` takes the focus back when it closes. */
+  readonly onSelectMovie: (movie: Movie, trigger: HTMLElement) => void;
   readonly onOpenAddMovie: (lookupMovie: LookupMovie) => void;
   readonly isConfigLoaded: boolean;
   readonly isConfigured: boolean;
@@ -30,11 +29,8 @@ export function MoviesView({
   searchQuery,
   searchResults,
   isSearching,
-  onSearchChange,
-  onClearSearch,
   movies,
-  localMovies,
-  serverMovies,
+  movieGroups,
   downloads,
   radarrQueue,
   findInLibrary,
@@ -72,9 +68,9 @@ export function MoviesView({
               key={lookupMovie.tmdbId}
               movie={lookupMovie}
               isAddHint={!libraryMovie}
-              onClick={() => {
+              onClick={event => {
                 if (libraryMovie) {
-                  onSelectMovie(libraryMovie);
+                  onSelectMovie(libraryMovie, event.currentTarget);
                 } else {
                   onOpenAddMovie(lookupMovie);
                 }
@@ -117,72 +113,39 @@ export function MoviesView({
     }
     return (
       <div className="movie-categories">
-        {localMovies.length > 0 && (
-          <div className="movie-category">
-            <h3 className="category-title">Mes films</h3>
+        {movieGroups.map(group => (
+          <section
+            key={group.key}
+            id={movieGroupSectionId(group.key)}
+            className="movie-category"
+            aria-labelledby={movieGroupHeadingId(group.key)}
+          >
+            <h3
+              className="category-title"
+              id={movieGroupHeadingId(group.key)}
+              tabIndex={-1}
+              aria-label={`${group.title}, ${group.movies.length} ${group.movies.length > 1 ? 'films' : 'film'}`}
+            >
+              <span>{group.title}</span>
+              <span className="category-count">{group.movies.length}</span>
+            </h3>
             <div className="movie-grid">
-              {localMovies.map(movie => (
+              {group.movies.map(movie => (
                 <MovieCard
                   key={movie.id}
                   movie={movie}
                   download={downloads[`movie-${movie.id}`]}
-                  onClick={() => onSelectMovie(movie)}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {serverMovies.length > 0 && (
-          <div className="movie-category">
-            <h3 className="category-title">Sur le serveur</h3>
-            <div className="movie-grid">
-              {serverMovies.map(movie => (
-                <MovieCard
-                  key={movie.id}
-                  movie={movie}
                   queueItem={radarrQueue[movie.id]}
-                  onClick={() => onSelectMovie(movie)}
+                  onClick={event => onSelectMovie(movie, event.currentTarget)}
                 />
               ))}
             </div>
-          </div>
-        )}
+          </section>
+        ))}
       </div>
     );
   };
 
-  return (
-    <div>
-      <h2>Films</h2>
-
-      {/* Search bar */}
-      <div className="search-bar">
-        <Input
-          type="text"
-          inputSize="lg"
-          placeholder="Rechercher un film…"
-          value={searchQuery}
-          onChange={e => onSearchChange(e.target.value)}
-          leftIcon={<Search size={18} />}
-          rightElement={
-            searchQuery ? (
-              <IconButton
-                icon={<X size={16} />}
-                onClick={onClearSearch}
-                aria-label="Effacer la recherche"
-                size="sm"
-                shape="circle"
-                variant="ghost"
-                className="search-clear"
-              />
-            ) : undefined
-          }
-        />
-      </div>
-
-      {/* Search results or library */}
-      {isSearchActive ? renderSearchContent() : renderLibraryContent()}
-    </div>
-  );
+  // Title and search field live in the top row (PageToolbar)
+  return <div>{isSearchActive ? renderSearchContent() : renderLibraryContent()}</div>;
 }

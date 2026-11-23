@@ -1,137 +1,761 @@
 /* ==========================================================================
-   Layout: Header & Navigation
+   App Shell: sidebar on the leading side, content scrolls on its own
    ========================================================================== */
-.melia-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  height: var(--header-height);
-  padding: 0 var(--space-2xl) 0 90px;
-  background: var(--bg-surface);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  box-sizing: border-box;
-  z-index: 40;
-}
+.melia-app {
+  /* Width the docked sidebar takes from the content (0 while hidden) */
+  --sidebar-docked-width: var(--sidebar-width);
+  /* Inline margin of the content, shared by the page toolbar so both start on the same edge */
+  --content-gutter: var(--space-2xl);
 
-.melia-header h1 {
-  margin: 0;
-  color: var(--accent-primary);
-  font-family: var(--font-heading), sans-serif;
-  font-size: var(--text-xl);
-  font-weight: 700;
-  letter-spacing: -0.5px;
-  user-select: none;
-}
-
-.header-tabs {
-  display: flex;
-  gap: var(--space-xl);
-}
-
-.tab-btn {
-  background: transparent;
-  color: var(--text-secondary);
-  border: none;
-  font-size: var(--text-base);
-  font-weight: 500;
-  letter-spacing: -0.2px;
-  cursor: pointer;
-  padding: var(--space-xs) 0;
   position: relative;
-  transition: color var(--duration-fast) var(--ease-out);
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  font-family: var(--font-body), sans-serif;
+  display: grid;
+  grid-template-columns: var(--sidebar-docked-width) minmax(0, 1fr);
+  grid-template-rows: var(--titlebar-height) minmax(0, 1fr);
+  height: 100vh;
+  overflow: hidden;
 }
 
-.tab-btn::after {
-  content: '';
-  position: absolute;
-  bottom: -4px;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  background-color: var(--accent-primary);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform var(--duration-base) var(--ease-out);
-}
+/* Hidden sidebar: the content takes the whole width */
+.melia-app.is-sidebar-collapsed {
+  --sidebar-docked-width: 0px;
 
-.tab-btn:hover {
-  color: var(--text-primary);
-}
-
-.tab-btn.active {
-  color: var(--text-primary);
-}
-
-.tab-btn.active::after {
-  transform: scaleX(1);
-}
-
-.tab-btn-icon {
-  padding: var(--space-xs);
-}
-
-.tab-btn-icon svg {
-  display: block;
-  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.tab-btn-icon:hover svg {
-  transform: rotate(45deg);
-}
-
-/* ==========================================================================
-   Main Content Wrapper
-   ========================================================================== */
-.melia-content {
-  padding: var(--space-xl) var(--space-2xl) 60px;
-  padding-top: calc(var(--header-height) + var(--space-xl));
-  flex-grow: 1;
-  max-width: 1600px;
-  margin: 0 auto;
-  width: calc(100% - 2 * var(--space-2xl));
+  grid-template-columns: minmax(0, 1fr);
 }
 
 @media (max-width: 999px) {
-  .melia-header {
-    padding-right: var(--space-xl);
-  }
-
-  .melia-content {
-    padding-left: var(--space-xl);
-    padding-right: var(--space-xl);
-    width: calc(100% - 2 * var(--space-xl));
+  .melia-app {
+    --content-gutter: var(--space-xl);
   }
 }
 
-.melia-content h2 {
-  font-family: var(--font-heading), sans-serif;
-  font-size: var(--text-xl);
-  letter-spacing: -0.3px;
-  margin-top: 0;
-  margin-bottom: var(--space-lg);
-  font-weight: 600;
-  text-transform: none;
-  color: var(--text-primary);
+/* ==========================================================================
+   Top row, across the whole window: traffic lights, logo and sidebar toggle,
+   then the page title and, centred on the content below, the search.
+   It floats over the docked sidebar's top (transparent there) and over the content,
+   which scrolls behind its translucent material.
+
+   Columns: docked sidebar | lead | search | trail. Lead and trail share the space
+   equally, so the search sits on the axis of the content column (the window's axis
+   while the sidebar is hidden). Lead never gets narrower than the window bar and the
+   full title: on a narrow window the search shrinks first, then slides towards the
+   trailing side; it never covers the title, the logo or the toggle.
+   ========================================================================== */
+.app-topbar {
+  /* Width of the page's content column (see .melia-content and the narrow views) */
+  --page-max-width: var(--content-max-width);
+
+  grid-row: 1;
+  grid-column: 1 / -1;
+  /* Floats over the pages, which scroll up to the window's top edge, and over the docked
+     sidebar (40) so the window bar stays on top; under the dialogs (100) */
+  position: relative;
+  z-index: 50;
+  display: grid;
+  grid-template-columns:
+    var(--sidebar-docked-width)
+    1fr
+    minmax(var(--search-min-width), var(--search-max-width))
+    minmax(var(--content-gutter), 1fr);
+  align-items: center;
+  min-width: 0;
+  height: var(--titlebar-height);
+}
+
+/* Translucent material behind the top row, over the content column only: from the docked
+   sidebar's edge (which stays opaque), or from the window edge while it is hidden. The one
+   element of the window with a backdrop filter. Tint 72 %: over pure white, the secondary
+   text (back button) keeps 5:1 and the title 7.6:1, while posters still show through.
+   It slides with the content when the sidebar is toggled (FLIP, data-sidebar-follow) and
+   lets clicks through to the drag area. Its hairline under the row meets the sidebar's. */
+.app-topbar-backdrop {
+  position: absolute;
+  inset-block: 0;
+  inset-inline: var(--sidebar-docked-width) 0;
+  border-block-end: 1px solid var(--border-subtle);
+  background-color: rgb(10 10 10 / 0.72);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  pointer-events: none;
+}
+
+/* Hidden sidebar: the window bar (logo, toggle) sits on the material too. A denser
+   leading corner keeps the red logo at 3:1 over the lightest poster, then fades out.
+   Physical side: it follows the traffic lights. */
+.is-sidebar-collapsed .app-topbar-backdrop {
+  background-image: linear-gradient(to right, rgb(10 10 10 / 0.85) 200px, rgb(10 10 10 / 0) 360px);
+}
+
+/* No blur available, or less transparency asked for: an opaque bar */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .app-topbar-backdrop {
+    background: var(--bg-base);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .app-topbar-backdrop {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--bg-base);
+  }
+}
+
+/* Downloads and settings use a narrower centred column */
+.app-topbar--narrow {
+  --page-max-width: var(--view-narrow-width);
+}
+
+/* Window bar then page title. Spans the sidebar column too: docked, the window bar
+   fills it; hidden, that column is 0 wide and both share the lead column. */
+.app-topbar-lead {
+  /* Positioned so the title and back button paint above the translucent backdrop (a positioned sibling painted before it) */
+  position: relative;
+  grid-column: 1 / 3;
+  align-self: stretch;
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  /* An item spanning a flexible column has no automatic minimum: keep the whole title */
+  min-width: min-content;
 }
 
-.melia-content h2::before {
+/* Traffic lights, logo and toggle. Pinned to the window corner so it never moves
+   between sidebar states: as wide as the docked sidebar, or just its content while
+   hidden, so the page title starts right after it.
+   The traffic lights are physical window geometry: left, not inline-start. */
+.window-bar {
+  position: relative;
+  z-index: 50;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-xs);
+  box-sizing: border-box;
+  width: var(--sidebar-docked-width);
+  height: 100%;
+  /* Clear the traffic lights with the same gap as between two toolbar groups */
+  padding-inline: calc(var(--window-controls-width) + var(--space-md)) var(--space-xs);
+}
+
+.is-sidebar-collapsed .window-bar {
+  width: auto;
+}
+
+.window-bar-logo {
+  margin: 0;
+  color: var(--accent-primary);
+  font-family: var(--font-heading), sans-serif;
+  font-size: var(--text-lg);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+  /* Clicks fall through to the drag area */
+  pointer-events: none;
+}
+
+/* Colour only, not the generic `all` of .ui-icon-btn: quick hover in, softer hover out */
+.window-bar-toggle {
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
+}
+
+.window-bar-toggle:hover {
+  transition-duration: var(--duration-micro);
+}
+
+.window-bar-toggle svg {
+  stroke-width: 1.75;
+}
+
+/* Icon swap (transitions.dev): both icons stay in the same cell and cross-fade
+   with blur and scale, the same way in both directions */
+.t-icon-swap {
+  position: relative;
+  display: inline-grid;
+}
+
+.t-icon-swap .t-icon {
+  display: flex;
+  grid-area: 1 / 1;
+  transition:
+    opacity var(--icon-swap-dur) var(--icon-swap-ease),
+    filter var(--icon-swap-dur) var(--icon-swap-ease),
+    transform var(--icon-swap-dur) var(--icon-swap-ease);
+}
+
+.t-icon-swap[data-state='open'] .t-icon[data-icon='open'],
+.t-icon-swap[data-state='close'] .t-icon[data-icon='close'] {
+  opacity: 1;
+  filter: blur(0);
+  transform: scale(1);
+}
+
+.t-icon-swap[data-state='open'] .t-icon[data-icon='close'],
+.t-icon-swap[data-state='close'] .t-icon[data-icon='open'] {
+  opacity: 0;
+  filter: blur(var(--icon-swap-blur));
+  transform: scale(var(--icon-swap-start-scale));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-icon-swap .t-icon {
+    transition: none !important;
+  }
+}
+
+/* ==========================================================================
+   Page title and search
+   ========================================================================== */
+/* Slot shared by the page title and the back button (movie detail page): both sit in
+   the same cell, so the word "Films" never shows twice. The slot itself lets clicks fall
+   through to the drag area; only the visible button catches them. */
+.page-toolbar-heading {
+  display: inline-grid;
+  flex: 0 1 auto;
+  align-items: center;
+  min-width: 0;
+  /* Same edge as the content below: 100vw is the window, the docked sidebar is taken out */
+  margin-inline-start: max(
+    var(--content-gutter),
+    calc((100vw - var(--sidebar-docked-width) - var(--page-max-width)) / 2)
+  );
+  pointer-events: none;
+}
+
+/* Hidden sidebar: the corner holds the traffic lights, logo and toggle.
+   The title follows the toggle, 24px from its edge (8px window bar padding + 16px) */
+.is-sidebar-collapsed .page-toolbar-heading {
+  margin-inline-start: var(--space-md);
+}
+
+.page-toolbar-title,
+.page-toolbar-back {
+  grid-area: 1 / 1;
+  min-width: 0;
+  font-family: var(--font-heading), sans-serif;
+  font-size: var(--text-base);
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.page-toolbar-title {
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  text-overflow: ellipsis;
+}
+
+/* Back button: plain chevron and word, no fill or outline, so it reads as the title it
+   replaces. Its label lands exactly where the title was; the chevron hangs in the gutter
+   before it (6px padding + 18px icon + 4px gap = 28px, less than the 32px minimum
+   gutter). The padding is invisible but keeps a 32px-high target. */
+.page-toolbar-back {
+  --back-hang: 28px;
+
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-micro);
+  height: 32px;
+  margin-inline-start: calc(var(--back-hang) * -1);
+  /* Chevron side tighter: the glyph carries its own side bearing */
+  padding-inline: 6px var(--space-sm);
+  border: none;
+  /* Shape of the focus ring only */
+  border-radius: 8px;
+  background: none;
+  color: var(--text-secondary);
+  /* Hand cursor from base.css; the slot above ignores the pointer, the button takes it back */
+  pointer-events: auto;
+}
+
+/* Hidden sidebar: no room before the slot (toggle), the button starts on the title's edge */
+.is-sidebar-collapsed .page-toolbar-back {
+  margin-inline-start: 0;
+}
+
+/* Hover, and a trackpad swipe back in progress: brighter text and chevron, colour only */
+.page-toolbar-back:hover,
+[data-back-swipe] .page-toolbar-back {
+  color: var(--text-primary);
+}
+
+.page-toolbar-back:active {
+  scale: 0.96;
+}
+
+.page-toolbar-back:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.6);
+  outline-offset: 2px;
+}
+
+.page-toolbar-back-icon {
+  flex: none;
+  stroke-width: 2;
+}
+
+/* Title / back swap (transitions.dev text swap soft + icon swap): the title and the
+   button cross-blur in place, no movement since the label keeps the title's spot; the
+   chevron grows in like an icon swap. Visibility flips once the fade is over, so the
+   hidden one leaves the tab order and the accessibility tree. */
+.page-toolbar-title,
+.page-toolbar-back {
+  transition:
+    opacity var(--text-swap-dur) var(--text-swap-ease),
+    filter var(--text-swap-dur) var(--text-swap-ease),
+    color var(--duration-quick) var(--ease-out),
+    scale var(--duration-quick) var(--ease-out),
+    visibility 0s linear 0s;
+}
+
+.page-toolbar-back:hover {
+  transition-duration: var(--text-swap-dur), var(--text-swap-dur), var(--duration-micro),
+    var(--duration-quick), 0s;
+}
+
+.page-toolbar-heading[data-state='back'] .page-toolbar-title,
+.page-toolbar-heading[data-state='title'] .page-toolbar-back {
+  opacity: 0;
+  filter: blur(var(--text-swap-blur));
+  visibility: hidden;
+  pointer-events: none;
+  transition-delay: 0s, 0s, 0s, 0s, var(--text-swap-dur);
+}
+
+/* Swipe back in progress: the chevron leans toward the side the page goes, up to the
+   page slide distance (8px), following the fingers without delay; it settles back with
+   the panel ease once the swipe ends or navigates. */
+.page-toolbar-back-icon {
+  translate: calc(var(--back-swipe, 0) * var(--page-slide-distance) * -1) 0;
+  transition:
+    opacity var(--icon-swap-dur) var(--icon-swap-ease),
+    filter var(--icon-swap-dur) var(--icon-swap-ease),
+    transform var(--icon-swap-dur) var(--icon-swap-ease),
+    translate var(--duration-quick) var(--ease-smooth-out);
+}
+
+[data-back-swipe] .page-toolbar-back-icon {
+  transition-property: opacity, filter, transform;
+}
+
+.page-toolbar-heading[data-state='title'] .page-toolbar-back-icon {
+  opacity: 0;
+  filter: blur(var(--icon-swap-blur));
+  transform: scale(var(--icon-swap-start-scale));
+}
+
+/* Reduced motion: no blur or scale; the global rule makes the swap immediate. The
+   swipe back keeps only its colour cue, the chevron stays in place. */
+@media (prefers-reduced-motion: reduce) {
+  .page-toolbar-heading[data-state] .page-toolbar-title,
+  .page-toolbar-heading[data-state] .page-toolbar-back,
+  .page-toolbar-heading[data-state] .page-toolbar-back-icon {
+    filter: none;
+    transform: none;
+    translate: none;
+  }
+
+  .page-toolbar-back:active {
+    scale: none;
+  }
+}
+
+/* Search field: a raised fill with a quiet outline at rest, the field outline on hover
+   and focus, plus the app's focus ring. Not a drag area. */
+.page-toolbar-search {
+  grid-column: 3;
+  min-width: 0;
+}
+
+.page-toolbar-search .ui-input-container {
+  border-color: var(--border-default);
+  background: var(--surface-2);
+}
+
+.page-toolbar-search .ui-input-container:hover,
+.page-toolbar-search .ui-input-container:focus-within {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+  box-shadow: none;
+}
+
+.page-toolbar-search .ui-input-container:has(> .ui-input-field:focus-visible) {
+  outline: 2px solid rgba(255, 255, 255, 0.6);
+  outline-offset: 2px;
+}
+
+/* Magnifier: quieter than the text, brighter once the field is in use */
+.page-toolbar-search .ui-input-icon--left {
+  color: var(--text-tertiary);
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.page-toolbar-search .ui-input-container:focus-within .ui-input-icon--left {
+  color: var(--text-secondary);
+}
+
+.page-toolbar-search .ui-input-icon--left svg {
+  stroke-width: 1.75;
+}
+
+/* Room for the shortcut hint, wider than the clear button */
+.page-toolbar-search .ui-input-container .ui-input-field.has-shortcut-hint {
+  padding-inline-end: 3.5rem;
+}
+
+/* Shortcut hint, only while the field is empty. Clicks go through to the field. */
+.page-toolbar-search .ui-input-element--right:has(> .search-shortcut) {
+  inset-inline-end: var(--space-xs);
+  pointer-events: none;
+}
+
+.search-shortcut {
+  padding: 3px 6px;
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  color: var(--text-placeholder);
+  font-family: var(--font-body), sans-serif;
+  font-size: var(--text-2xs);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* Clear button inside the 36px field: 24px visible, 32px hit area */
+.page-toolbar-search .search-clear {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  color: var(--text-tertiary);
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.page-toolbar-search .search-clear::after {
   content: '';
-  display: block;
-  width: 4px;
-  height: 22px;
-  background-color: var(--accent-primary);
-  border-radius: 2px;
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+}
+
+/* ==========================================================================
+   Sidebar
+   ========================================================================== */
+.sidebar {
+  --sidebar-icon-size: 18px;
+  --sidebar-item-padding: var(--space-sm);
+
+  grid-row: 1 / -1;
+  grid-column: 1;
+  position: relative;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface-1);
+}
+
+/* Docked: a hairline separates it from the content. The line under the top row
+   starts right after it (see .app-topbar-backdrop), so the two meet without overlapping. */
+.sidebar:not(.is-collapsed) {
+  border-inline-end: 1px solid var(--border-subtle);
+}
+
+/* Hidden: out of the grid, parked just past the window edge, transparent and unreachable.
+   Its travel equals its width, so it moves in step with the content when docked or
+   hidden with the toggle. */
+.sidebar.is-collapsed {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--sidebar-width);
+  transform: translateX(-100%);
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* Panel reveal (transitions.dev), without its blur. Transitions, not keyframes:
+   a toggle mid-slide reverses from where the panel is. */
+@media (prefers-reduced-motion: no-preference) {
+  /* Opening (docking from hidden) */
+  .sidebar {
+    transition:
+      transform var(--panel-open-dur) var(--panel-ease),
+      opacity var(--panel-open-dur) var(--panel-ease),
+      visibility 0s linear 0s;
+  }
+
+  /* Closing is quicker than opening; visibility flips once the slide is over */
+  .sidebar.is-collapsed {
+    transition:
+      transform var(--panel-close-dur) var(--panel-ease),
+      opacity var(--panel-close-dur) var(--panel-ease),
+      visibility 0s linear var(--panel-close-dur);
+  }
+
+  /* Content, page title and search: useSidebar moves them back to where they were
+     before the toggle, then lets this transition bring them to their new place,
+     in step with the sidebar */
+  [data-sidebar-follow] {
+    transition: transform var(--panel-close-dur) var(--panel-ease);
+  }
+
+  .melia-app:not(.is-sidebar-collapsed) [data-sidebar-follow] {
+    transition-duration: var(--panel-open-dur);
+  }
+}
+
+/* Reduced motion: no slide, a short cross-fade; the content changes place at once */
+@media (prefers-reduced-motion: reduce) {
+  .sidebar.is-collapsed {
+    transform: none;
+    transition:
+      opacity var(--duration-quick) linear,
+      visibility 0s linear var(--duration-quick);
+  }
+}
+
+/* Drag area under the top row */
+.sidebar-top {
+  flex-shrink: 0;
+  height: var(--titlebar-height);
+  margin-block-end: var(--space-xs);
+}
+
+.sidebar-nav {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  min-height: 0;
+  padding: 0 var(--space-xs) var(--space-md);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sidebar-list,
+.sidebar-sublist {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sidebar-list {
+  gap: var(--space-micro);
+}
+
+.sidebar-sublist {
+  gap: 2px;
+  margin-block: var(--space-micro) var(--space-xs);
+}
+
+/* Main entries */
+.sidebar-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sidebar-item-padding);
+  width: 100%;
+  min-height: 40px;
+  padding: var(--space-xs) var(--sidebar-item-padding);
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-body), sans-serif;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1.25;
+  text-align: start;
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.sidebar-link-icon {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.sidebar-link-icon svg {
+  stroke-width: 1.75;
+}
+
+.sidebar-link-label {
+  min-width: 0;
+}
+
+.sidebar-badge {
+  margin-inline-start: auto;
+}
+
+.sidebar-link:hover {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+/* Active entry: filled row, heavier label and stroke, red icon */
+.sidebar-link.is-active {
+  background: var(--surface-3);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.sidebar-link.is-active .sidebar-link-icon {
+  color: var(--accent-primary);
+}
+
+.sidebar-link.is-active .sidebar-link-icon svg {
+  stroke-width: 2;
+}
+
+/* Library groups under "Films": text aligned with the parent label */
+.sidebar-sublink {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+  width: 100%;
+  min-height: 32px;
+  padding: 6px var(--sidebar-item-padding);
+  padding-inline-start: calc(2 * var(--sidebar-item-padding) + var(--sidebar-icon-size));
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-body), sans-serif;
+  font-size: var(--text-sm);
+  font-weight: 400;
+  line-height: 1.25;
+  text-align: start;
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.sidebar-sublink:hover {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+/* Group on screen: filled row and brighter label */
+.sidebar-sublink.is-current {
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.sidebar-link:focus-visible,
+.sidebar-sublink:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.6);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Main Content: two pages stacked in the same cell (tab views, movie detail).
+   It starts at the window's top edge, under the translucent top row, so the
+   posters scroll behind it. Only the visible page scrolls; `clip`, unlike
+   `hidden`, can never be scrolled by scrollIntoView, so the pages stay in place.
+   ========================================================================== */
+.melia-content {
+  grid-row: 1 / -1;
+  grid-column: -2 / -1;
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  overflow: clip;
+}
+
+/* The top row covers the first --titlebar-height of each page: scrolling to a section
+   or to a focused control keeps it below the row */
+.melia-page {
+  grid-area: 1 / 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block-start: var(--titlebar-height);
+}
+
+/* Tab views: content column centred, up to --content-max-width, starting below the top row */
+.melia-page[data-page-id='1'] {
+  padding: calc(var(--titlebar-height) + var(--space-lg))
+    max(var(--content-gutter), calc((100% - var(--content-max-width)) / 2)) 60px;
+}
+
+/* Section reached from the sidebar: a little air between the top row and its heading
+   (added to the page's scroll padding) */
+.melia-page section[id] {
+  scroll-margin-top: var(--space-lg);
+}
+
+/* Page side-by-side (transitions.dev): the list leaves to the leading side, the detail
+   page comes from the trailing side, with a fade and a light blur. Transitions, not
+   keyframes: going back mid-slide reverses from where the pages are.
+   Adapted from the snippet: the pages share one grid cell instead of `position: absolute`
+   (each keeps its own height and scroll); at rest they carry no transform, filter or
+   will-change, so fixed dialogs inside them (confirmations) still cover the window;
+   the hidden page also leaves the accessibility tree once it has faded (visibility). */
+.t-page-slide {
+  position: relative;
+}
+
+.t-page-slide .t-page[data-page-id='1'] {
+  --t-page-from-x: calc(var(--page-slide-distance) * -1);
+}
+
+.t-page-slide .t-page[data-page-id='2'] {
+  --t-page-from-x: var(--page-slide-distance);
+}
+
+.t-page-slide .t-page {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateX(calc(var(--t-page-from-x, 0px) * var(--page-exit-enabled)));
+  filter: blur(calc(var(--page-blur) * var(--page-exit-enabled)));
+  transition:
+    opacity var(--page-fade-dur) var(--page-fade-ease),
+    transform var(--page-slide-dur) var(--page-slide-ease),
+    filter var(--page-slide-dur) var(--page-slide-ease),
+    visibility 0s linear var(--page-fade-dur);
+}
+
+.t-page-slide[data-page='1'] .t-page[data-page-id='1'],
+.t-page-slide[data-page='2'] .t-page[data-page-id='2'] {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: none;
+  filter: none;
+  transition-delay: var(--page-stagger);
+}
+
+/* Reduced motion: no slide or blur, a short cross-fade (stronger than the global
+   reduced-motion rule, which would otherwise make the change instant) */
+@media (prefers-reduced-motion: reduce) {
+  .t-page-slide .t-page {
+    transform: none;
+    filter: none;
+    transition:
+      opacity var(--duration-quick) linear,
+      visibility 0s linear var(--duration-quick) !important;
+  }
+
+  .t-page-slide[data-page='1'] .t-page[data-page-id='1'],
+  .t-page-slide[data-page='2'] .t-page[data-page-id='2'] {
+    transition:
+      opacity var(--duration-quick) linear,
+      visibility 0s linear 0s !important;
+  }
 }

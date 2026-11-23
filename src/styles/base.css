@@ -8,21 +8,60 @@ body {
   font-family: var(--font-body), sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow-y: scroll;
+  overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
   -webkit-user-drag: none;
   cursor: default;
 }
 
-::-webkit-scrollbar {
-  display: none;
+/* ==========================================================================
+   Cursors
+   WebKit shows the arrow over <button> by default. Everything clickable gets the
+   hand here, once for the whole app; :where() keeps it at zero specificity so a
+   component can still opt out (e.g. a row that is not clickable right now).
+   ========================================================================== */
+:where(
+  button,
+  [role='button'],
+  [role='tab'],
+  [role='link'],
+  [role='switch'],
+  a[href],
+  select,
+  summary,
+  label[for],
+  input[type='checkbox'],
+  input[type='radio'],
+  input[type='button'],
+  input[type='submit'],
+  input[type='reset'],
+  input[type='file']
+) {
+  cursor: pointer;
 }
 
-.melia-app {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
+/* Text fields keep the text cursor instead of inheriting the body's arrow */
+:where(
+  textarea,
+  [contenteditable='true'],
+  input:not([type='checkbox'], [type='radio'], [type='button'], [type='submit'], [type='reset'], [type='file'], [type='range'], [type='color'])
+) {
+  cursor: text;
+}
+
+/* Disabled controls: same "not allowed" cursor as the rest of the app. Not wrapped
+   in :where(), so it wins over a component's own `cursor: pointer`. */
+button:disabled,
+select:disabled,
+input:disabled,
+textarea:disabled,
+[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
+::-webkit-scrollbar {
+  display: none;
 }
 
 /* ==========================================================================

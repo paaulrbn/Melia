@@ -1,6 +1,7 @@
+import type { MouseEvent } from 'react';
 import { DownloadInfo, LookupMovie, Movie, QueueRecord } from '../../types';
 import { getImageUrl } from '../../utils/media';
-import { CircleAlert, Play, Plus } from 'lucide-react';
+import { Play, Plus } from 'lucide-react';
 import { ProgressBar } from '../ui';
 
 interface MovieCardProps {
@@ -8,7 +9,7 @@ interface MovieCardProps {
   readonly download?: DownloadInfo;
   readonly queueItem?: QueueRecord;
   readonly isAddHint?: boolean;
-  readonly onClick: () => void;
+  readonly onClick: (event: MouseEvent<HTMLButtonElement>) => void;
 }
 
 export function MovieCard({
@@ -26,34 +27,15 @@ export function MovieCard({
     serverProgress = Math.round(((queueItem.size - queueItem.sizeleft) / queueItem.size) * 100);
   }
 
-  // Library movie monitored by Radarr but with no file, not downloading and not in the queue
-  const isMissing =
-    'hasFile' in movie &&
-    !movie.hasFile &&
-    movie.monitored !== false &&
-    !queueItem &&
-    !download;
-
   return (
     <button
       type="button"
       className="movie-card"
+      // Library poster: found again to take back the focus when its detail page closes
+      data-movie-id={'id' in movie ? movie.id : undefined}
       onClick={onClick}
     >
       {posterUrl && <img src={posterUrl} alt={movie.title} loading="lazy" />}
-      {isMissing && (
-        <>
-          <span className="movie-missing-band" aria-hidden="true" />
-          <span
-            className="movie-missing-icon"
-            role="img"
-            aria-label="Film manquant sur le serveur"
-            title="Film manquant sur le serveur"
-          >
-            <CircleAlert size={14} aria-hidden="true" />
-          </span>
-        </>
-      )}
       <div className="movie-overlay">
         <h3>{movie.title}</h3>
         <span className="year">{movie.year}</span>

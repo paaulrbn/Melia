@@ -2,7 +2,7 @@
    Settings View
    ========================================================================== */
 .settings-view {
-  max-width: 900px;
+  max-width: var(--view-narrow-width);
   margin: 0 auto;
 }
 

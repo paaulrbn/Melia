@@ -106,8 +106,6 @@ export function SettingsView({
 
   return (
     <div className="settings-view">
-      <h2>Paramètres</h2>
-
       <div className="settings-list">
         {/* Download folder */}
         <div className="settings-item">

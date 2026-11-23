@@ -152,111 +152,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.unavailable-text {
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-  font-weight: 400;
-  line-height: 1.5;
-  margin: 0;
-}
-
-.modal-actions {
-  display: flex;
-  gap: var(--space-md);
-  margin-bottom: var(--space-lg);
-}
-
-.modal-quality-row {
-  display: flex;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  gap: var(--space-md);
-  margin-bottom: var(--space-md);
-}
-
-.modal-quality-status {
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-  align-self: center;
-}
-
-.modal-quality-status--error {
-  color: var(--danger);
-}
-
-/* ==========================================================================
-   Modal Download Progress (Flat, Integrated — No "Box in the Box")
-   ========================================================================== */
-.modal-download-section {
-  margin-top: var(--space-lg);
-  padding-top: var(--space-md);
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-  width: 100%;
-}
-
-.modal-download-section--server {
-  margin-top: 0;
-  padding-top: 0;
-  border-top: none;
-}
-
-.modal-dl-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-md);
-  min-width: 0;
-}
-
-.modal-dl-status {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  min-width: 0;
-}
-
-.modal-dl-title {
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--text-primary);
-  letter-spacing: -0.1px;
-}
-
-.modal-dl-percentage {
-  font-size: var(--text-sm);
-  font-weight: 700;
-  color: var(--accent-text);
-  font-variant-numeric: tabular-nums;
-}
-
-.modal-dl-percentage--server {
-  color: var(--status-server);
-}
-
-.modal-dl-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  flex-shrink: 0;
-}
-
-.modal-dl-progress {
-  width: 100%;
-}
-
-.modal-dl-stats {
-  font-size: var(--text-xs);
-  color: var(--text-tertiary);
-  font-variant-numeric: tabular-nums;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 2px;
-}
-
 /* ==========================================================================
    Add Movie Modal
    ========================================================================== */
@@ -501,7 +396,6 @@
   font-size: var(--text-sm);
   font-weight: 500;
   padding: 8px 2px 12px 2px;
-  cursor: pointer;
   display: inline-flex;
   align-items: center;
   white-space: nowrap;
@@ -617,7 +511,6 @@
 }
 
 button.episode-index-wrap {
-  cursor: pointer;
   padding: 0;
   outline: none;
 }
@@ -635,7 +528,6 @@ button.episode-index-wrap:focus-visible {
   margin: 0;
   font: inherit;
   text-align: left;
-  cursor: pointer;
   color: inherit;
   display: inline-flex;
   align-items: center;

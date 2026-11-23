@@ -9,7 +9,7 @@
 .update-island {
   position: fixed;
   bottom: 20px;
-  left: 50%;
+  left: calc(50% + var(--sidebar-docked-width, 0px) / 2); /* Centered on the content, not the window */
   transform: translateX(-50%);
   z-index: 200;
   display: flex;
@@ -48,7 +48,6 @@
   font-family: var(--font-body), sans-serif;
   font-size: var(--text-2xs);
   font-weight: 600;
-  cursor: pointer;
   transition: opacity var(--duration-fast) var(--ease-out);
 }
 
@@ -58,7 +57,6 @@
 
 .update-cta:disabled {
   opacity: 0.4;
-  cursor: not-allowed;
 }
 
 .update-dismiss {
@@ -71,7 +69,6 @@
   background: transparent;
   border: none;
   color: rgba(255, 255, 255, 0.25);
-  cursor: pointer;
   transition: color var(--duration-fast) var(--ease-out);
 }
 

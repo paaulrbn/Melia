@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Config, DownloadInfo, LookupMovie, Movie, QualityProfile, QueueRecord } from '../types';
 import { STORAGE_KEYS } from '../utils/constants';
 import { normalizeRootFolder } from '../utils/formatters';
+import { groupMovies } from '../utils/movieGroups';
 import { useAdaptivePolling } from './useAdaptivePolling';
 import {
   fetchRadarrMovies,
@@ -259,7 +260,7 @@ export function useMovies({
     }
   }, [radarrUrl, radarrKey, selectedQuality]);
 
-  // Profiles are needed in the detail modal to change the quality of a missing movie
+  // Profiles are needed on the detail page to change the quality of a missing movie
   const hasSelectedMovie = selectedMovie !== null;
   useEffect(() => {
     if (hasSelectedMovie && qualityProfiles.length === 0) {
@@ -375,31 +376,11 @@ export function useMovies({
     [movies]
   );
 
-  // Categorized movies
-  const localMovies = useMemo(() => {
-    return movies
-      .filter(m => {
-        const dl = downloads[`movie-${m.id}`];
-        return dl?.status === 'completed' || dl?.status === 'downloading' || dl?.status === 'paused';
-      })
-      .sort((a, b) => {
-        const dlA = downloads[`movie-${a.id}`];
-        const dlB = downloads[`movie-${b.id}`];
-        const isCompletedA = dlA?.status === 'completed';
-        const isCompletedB = dlB?.status === 'completed';
-        if (isCompletedA && !isCompletedB) return -1;
-        if (!isCompletedA && isCompletedB) return 1;
-        return 0;
-      });
-  }, [movies, downloads]);
-
-  const serverMovies = useMemo(() => {
-    return movies.filter(m => {
-      const dl = downloads[`movie-${m.id}`];
-      const isLocal = dl?.status === 'completed' || dl?.status === 'downloading' || dl?.status === 'paused';
-      return !isLocal;
-    });
-  }, [movies, downloads]);
+  // Library split into exclusive groups (Mes films, En téléchargement, Sur le serveur…)
+  const movieGroups = useMemo(
+    () => groupMovies(movies, downloads, radarrQueue),
+    [movies, downloads, radarrQueue]
+  );
 
   const handleCancelQueueItem = useCallback(async (queueId: number) => {
     if (!radarrUrl || !radarrKey) return;
@@ -414,8 +395,7 @@ export function useMovies({
 
   return {
     movies,
-    localMovies,
-    serverMovies,
+    movieGroups,
     radarrQueue,
     selectedMovie,
     setSelectedMovie,

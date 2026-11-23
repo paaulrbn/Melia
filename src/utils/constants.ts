@@ -28,4 +28,5 @@ export const STORAGE_KEYS = {
   AUTO_DOWNLOAD: 'melia_autodownload_ids',
   SERIES_AUTO_DOWNLOAD: 'melia_series_autodownload_ids',
   LAST_SEEN_VERSION: 'melia_last_seen_version',
+  SIDEBAR_COLLAPSED: 'melia_sidebar_collapsed',
 } as const;

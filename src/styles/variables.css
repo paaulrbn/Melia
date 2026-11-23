@@ -11,10 +11,15 @@
   --surface-3: #242424;   /* Hover */
   --surface-4: #2e2e2e;   /* Strong hover */
   --border-strong: #5e5e5e; /* Field outlines, 3:1 on the background */
+  --border-default: rgba(255, 255, 255, 0.12); /* Quiet outline of a control at rest */
+  --border-subtle: rgba(255, 255, 255, 0.07);  /* Layout separators: sidebar edge, under the top row */
   --text-primary: rgba(255, 255, 255, 0.95);
   --text-secondary: rgba(255, 255, 255, 0.7);
   --text-tertiary: rgba(255, 255, 255, 0.45);
+  --text-placeholder: rgba(255, 255, 255, 0.5); /* Placeholders and key hints, 5.2:1 on --surface-2 */
   --accent-primary: #E50914; /* Cinematic Red */
+  --fill-primary: #ffffff;       /* Main action of a page (Play): --bg-base text, 19.8:1 */
+  --fill-primary-hover: #e0e0e0; /* Its hover: slightly grey, solid, --bg-base text 15:1 */
   --accent-text: #ff3b44;    /* Red for small text, 4.5:1 on the background */
   --danger: #ff4d4f;         /* Errors and destructive actions */
   --accent-server: #0071eb;
@@ -50,11 +55,45 @@
   --space-2xl: 48px;      /* 2XL */
 
   /* Layout & Effects */
-  --glass-blur: blur(24px);
   --duration-fast: 200ms;   /* Colour, opacity */
   --duration-base: 400ms;   /* Hover, small moves */
   --duration-slow: 400ms;   /* Larger moves, panels */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --transition-smooth: all var(--duration-base) var(--ease-out);
-  --header-height: 56px;
+
+  /* Motion tokens (transitions.dev scale), used by the sidebar and its toggle */
+  --duration-micro: 80ms;    /* Hover in */
+  --duration-quick: 150ms;   /* Hover out, colour of a navigation row, reduced-motion fade */
+  --duration-medium: 350ms;  /* Panel close */
+  --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1); /* Panels: open, close, slide */
+  --ease-in-out: ease-in-out; /* Icon swap */
+  --blur-small: 2px;
+  --panel-open-dur: var(--duration-slow);    /* 400ms */
+  --panel-close-dur: var(--duration-medium); /* 350ms: closing is quicker than opening */
+  --panel-ease: var(--ease-smooth-out);
+  --icon-swap-dur: 250ms;    /* Same both ways */
+  --icon-swap-blur: var(--blur-small);
+  --icon-swap-start-scale: 0.25;
+  --icon-swap-ease: var(--ease-in-out);
+  /* Text swap soft: page title <-> back button in the top row */
+  --text-swap-dur: var(--duration-quick); /* 150ms */
+  --text-swap-blur: var(--blur-small);
+  --text-swap-ease: var(--ease-in-out);
+  /* Page side-by-side: movie list and movie detail page */
+  --page-slide-dur: 250ms;
+  --page-fade-dur: 250ms;
+  --page-slide-distance: 8px;
+  --page-blur: 3px;
+  --page-stagger: 0ms;
+  --page-exit-enabled: 1;
+  --page-slide-ease: var(--ease-smooth-out);
+  --page-fade-ease: var(--ease-smooth-out);
+  --titlebar-height: 52px;  /* Top row: traffic lights (trafficLightPosition x 20, y 22), logo, sidebar toggle, page title and search */
+  --content-max-width: 1600px; /* Content column of the libraries */
+  --view-narrow-width: 900px;  /* Content column of the downloads and settings pages */
+  --detail-max-width: 1120px;  /* Content column of the movie detail page (backdrop excluded) */
+  --window-controls-width: 76px; /* Window edge to the end of the traffic lights: 20 inset + 3 buttons */
+  --sidebar-width: 232px;   /* Longest entry ("Téléchargements" + badge) with room to grow */
+  --search-max-width: 26rem;  /* Page search in the top row: 416px, shrinks down to --search-min-width */
+  --search-min-width: 12rem;
 }
