@@ -21,6 +21,11 @@ export interface Movie {
   qualityProfileId?: number;
   rootFolderPath?: string;
   monitored?: boolean;
+  /** Radarr release status: only `released` means a file can exist */
+  status?: 'tba' | 'announced' | 'inCinemas' | 'released' | 'deleted';
+  inCinemas?: string;
+  digitalRelease?: string;
+  physicalRelease?: string;
 }
 
 export interface LookupMovie {
