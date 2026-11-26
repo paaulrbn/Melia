@@ -5,6 +5,8 @@ use tauri::Manager;
 
 mod commands;
 use commands::*;
+#[cfg(target_os = "macos")]
+mod mouse_nav;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -22,6 +24,8 @@ pub fn run() {
                     use tauri_plugin_deep_link::DeepLinkExt;
                     let _ = app.deep_link().register_all();
                 }
+                #[cfg(target_os = "macos")]
+                mouse_nav::install(app.handle());
                 let player_proxy = proxy::start(http_client, runtime)?;
                 app.manage(player_proxy);
                 Ok(())

@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react';
 import { flushSync } from 'react-dom';
+import { listen } from '@tauri-apps/api/event';
 import { isEditableTarget } from './useSidebar';
 import {
   INITIAL_MOMENTUM,
@@ -103,19 +104,65 @@ export function useBackForward({
   });
 
   useEffect(() => {
+    const navigate = (direction: 'back' | 'forward') => {
+      if (isDialogOpen()) return;
+      if (direction === 'back') latest.current.onBack('other');
+      else latest.current.onForward();
+    };
+
+    // macOS: WKWebView reports the side buttons as the middle one, so the Rust side reads
+    // them from AppKit and sends `mouse-nav` instead (src-tauri/src/mouse_nav.rs)
+    const isMac = document.documentElement.classList.contains('is-macos');
+
     const onMouseButton = (event: MouseEvent) => {
       if (event.button !== MOUSE_BACK && event.button !== MOUSE_FORWARD) return;
       // WebView2 would otherwise navigate the webview itself
       event.preventDefault();
-      if (event.type !== 'mouseup' || isDialogOpen()) return;
-      if (event.button === MOUSE_BACK) latest.current.onBack('other');
-      else latest.current.onForward();
+      if (isMac || event.type !== 'mouseup') return;
+      navigate(event.button === MOUSE_BACK ? 'back' : 'forward');
+    };
+
+    // Keyboard, as in Safari: ⌘[ / ⌘] on macOS, Alt+Left / Alt+Right elsewhere. Some mouse
+    // utilities (Logitech Options+…) also send these shortcuts for the side buttons.
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.repeat || isEditableTarget(event.target)) return;
+      let direction: 'back' | 'forward' | null = null;
+      if (isMac && event.metaKey && !event.altKey && !event.ctrlKey) {
+        if (event.code === 'BracketLeft') direction = 'back';
+        else if (event.code === 'BracketRight') direction = 'forward';
+      } else if (!isMac && event.altKey && !event.ctrlKey && !event.metaKey) {
+        if (event.key === 'ArrowLeft') direction = 'back';
+        else if (event.key === 'ArrowRight') direction = 'forward';
+      }
+      if (!direction) return;
+      event.preventDefault();
+      navigate(direction);
     };
 
     window.addEventListener('mousedown', onMouseButton);
     window.addEventListener('mouseup', onMouseButton);
     window.addEventListener('auxclick', onMouseButton);
+    window.addEventListener('keydown', onKeyDown);
+
+    let isActive = true;
+    let unlisten: (() => void) | null = null;
+    if (isMac) {
+      listen<string>('mouse-nav', event => {
+        if (event.payload === 'back' || event.payload === 'forward') navigate(event.payload);
+      })
+        .then(stop => {
+          if (isActive) unlisten = stop;
+          else stop();
+        })
+        .catch(() => {
+          // Outside Tauri (plain browser): no native events
+        });
+    }
+
     return () => {
+      isActive = false;
+      unlisten?.();
+      window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('mousedown', onMouseButton);
       window.removeEventListener('mouseup', onMouseButton);
       window.removeEventListener('auxclick', onMouseButton);

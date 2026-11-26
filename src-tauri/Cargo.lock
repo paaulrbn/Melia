@@ -4226,8 +4226,11 @@ version = "0.4.0"
 dependencies = [
  "axum",
  "base64 0.23.1",
+ "block2",
  "dirs",
  "keyring",
+ "objc2",
+ "objc2-app-kit",
  "reqwest",
  "rfd",
  "serde",
