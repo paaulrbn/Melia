@@ -130,7 +130,8 @@ export function useSeries({ config, downloads }: UseSeriesProps) {
 
   // Load episodes for a specific series with cache
   const loadSeriesEpisodes = useCallback(async (seriesId: number, forceRefresh = false): Promise<Episode[]> => {
-    if (!forceRefresh && episodesCache[seriesId]) {
+    // An empty list is not kept: a series just added has no episodes until Sonarr has read it
+    if (!forceRefresh && episodesCache[seriesId]?.length) {
       return episodesCache[seriesId];
     }
 
@@ -176,13 +177,6 @@ export function useSeries({ config, downloads }: UseSeriesProps) {
       }
     }
   }, [loadSeriesEpisodes, sonarrUrl, sonarrKey]);
-
-  // Refresh episodes for currently selected series
-  const refreshCurrentEpisodes = useCallback(async () => {
-    if (selectedSeries) {
-      await loadSeriesEpisodes(selectedSeries.id, true);
-    }
-  }, [selectedSeries, loadSeriesEpisodes]);
 
   // Polling queue from Sonarr
   const pollQueue = useCallback(async (): Promise<boolean> => {
@@ -249,9 +243,14 @@ export function useSeries({ config, downloads }: UseSeriesProps) {
     };
   }, [sonarrUrl, sonarrKey, loadSeries]);
 
-  // Add series handler
+  // Series shown on the add page right now: an addition that ends after the page changed
+  // must not close or report on another series' page
+  const addingSeriesRef = useRef<LookupSeries | null>(null);
+
   const openAddSeries = useCallback(async (lookupSeries: LookupSeries) => {
+    addingSeriesRef.current = lookupSeries;
     setAddingSeries(lookupSeries);
+    setIsAddingSeries(false);
     setAddSeriesError(null);
     setSelectedQuality(null);
 
@@ -270,12 +269,17 @@ export function useSeries({ config, downloads }: UseSeriesProps) {
   }, [sonarrUrl, sonarrKey]);
 
   const closeAddSeries = useCallback(() => {
+    addingSeriesRef.current = null;
     setAddingSeries(null);
     setAddSeriesError(null);
+    setIsAddingSeries(false);
   }, []);
 
-  const handleAddSeries = useCallback(async () => {
-    if (!addingSeries || !sonarrUrl || !sonarrKey) return false;
+  /** Resolves to the series created in Sonarr, or null when the addition failed. */
+  const handleAddSeries = useCallback(async (): Promise<Series | null> => {
+    if (!addingSeries || !sonarrUrl || !sonarrKey) return null;
+    const target = addingSeries;
+    const isStillShown = () => addingSeriesRef.current === target;
 
     setIsAddingSeries(true);
     setAddSeriesError(null);
@@ -283,27 +287,26 @@ export function useSeries({ config, downloads }: UseSeriesProps) {
     try {
       const cleanRoot = await resolveSonarrRootFolder(config['SONARR_ROOT_FOLDER']);
 
-      await addSonarrSeries({
+      const created = await addSonarrSeries({
         rootFolder: cleanRoot,
-        tvdbId: addingSeries.tvdbId,
-        title: addingSeries.title,
-        year: addingSeries.year,
+        tvdbId: target.tvdbId,
+        title: target.title,
+        year: target.year,
         qualityProfileId: selectedQuality || (qualityProfiles[0]?.id ?? 1),
-        seasons: (addingSeries.seasons || []).map(s => ({
+        seasons: (target.seasons || []).map(s => ({
           seasonNumber: s.seasonNumber,
           monitored: false,
         })),
       });
 
       await loadSeries();
-      closeAddSeries();
-      return true;
+      if (isStillShown()) closeAddSeries();
+      return created?.id ? created : null;
     } catch (e: unknown) {
-      const msg = parseSonarrErrorMessage(e);
-      setAddSeriesError(msg);
-      return false;
+      if (isStillShown()) setAddSeriesError(parseSonarrErrorMessage(e));
+      return null;
     } finally {
-      setIsAddingSeries(false);
+      if (isStillShown()) setIsAddingSeries(false);
     }
   }, [addingSeries, sonarrUrl, sonarrKey, config, selectedQuality, qualityProfiles, loadSeries, closeAddSeries]);
 
@@ -448,7 +451,6 @@ export function useSeries({ config, downloads }: UseSeriesProps) {
     handleCancelQueueItem,
     handleSearchEpisode,
     handleSearchSeason,
-    refreshCurrentEpisodes,
     findInLibrary,
     loadSeries,
     loadSeriesEpisodes,

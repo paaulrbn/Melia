@@ -12,7 +12,7 @@ interface QualityPickerProps {
 }
 
 /**
- * Quality choice of the movie page: a glass capsule of the side actions' family, with
+ * Quality choice of a detail page: a glass capsule of the side actions' family, with
  * "Qualité" and the current value inside it. A real `<select>` lies over the capsule,
  * transparent, so the click opens the native macOS menu and screen readers get a
  * labelled list box.
@@ -21,14 +21,14 @@ export function QualityPicker({ profiles, value, onChange, disabled = false }: R
   const current = profiles.find(qp => qp.id === value);
 
   return (
-    <div className="movie-detail-quiet movie-detail-quality" data-disabled={disabled ? '' : undefined}>
-      <span className="movie-detail-quality-text" aria-hidden="true">
-        <span className="movie-detail-quality-label">Qualité</span>
-        <span className="movie-detail-quality-value">{current?.name ?? 'Choisir'}</span>
+    <div className="media-detail-quiet media-detail-quality" data-disabled={disabled ? '' : undefined}>
+      <span className="media-detail-quality-text" aria-hidden="true">
+        <span className="media-detail-quality-label">Qualité</span>
+        <span className="media-detail-quality-value">{current?.name ?? 'Choisir'}</span>
       </span>
-      <ChevronsUpDown className="movie-detail-quality-chevron" size={16} aria-hidden="true" />
+      <ChevronsUpDown className="media-detail-quality-chevron" size={16} aria-hidden="true" />
       <select
-        className="movie-detail-quality-select"
+        className="media-detail-quality-select"
         aria-label="Qualité"
         value={current ? current.id : ''}
         onChange={e => onChange(Number(e.target.value))}
@@ -79,53 +79,55 @@ export function TransferStatus({
   const titleId = `${id}-title`;
 
   return (
-    <section className="movie-detail-transfer" data-state={state} aria-labelledby={titleId}>
-      <div className="movie-detail-transfer-head">
-        <div className="movie-detail-transfer-text">
-          <h3 className="movie-detail-transfer-title" id={titleId} aria-live="polite">
+    <section className="media-detail-transfer" data-state={state} aria-labelledby={titleId}>
+      <div className="media-detail-transfer-head">
+        <div className="media-detail-transfer-text">
+          <h3 className="media-detail-transfer-title" id={titleId} aria-live="polite">
             {title}
           </h3>
           {details.length > 0 && (
-            <p className="movie-detail-transfer-detail">
+            <p className="media-detail-transfer-detail">
               {details.map((detail, index) => (
                 <span key={index}>{detail}</span>
               ))}
             </p>
           )}
         </div>
-        {actions && <div className="movie-detail-transfer-actions">{actions}</div>}
+        {actions && <div className="media-detail-transfer-actions">{actions}</div>}
       </div>
       <TransferBar value={progress} state={state} labelledBy={titleId} />
     </section>
   );
 }
 
-/** Heading of the movie page: it takes the focus when the page opens. */
-export const MOVIE_DETAIL_HEADING_ID = 'movie-detail-title';
+/** Heading of a detail page (movie or series): it takes the focus when the page opens. */
+export const MEDIA_DETAIL_HEADING_ID = 'media-detail-title';
 
-interface MovieDetailLayoutProps {
+interface MediaDetailLayoutProps {
   readonly title: string;
   readonly fanartUrl: string | null;
   readonly posterUrl: string | null;
-  /** Line between the title and the facts (director's name); nothing when absent. */
+  /** Line between the title and the facts (director, network); nothing when absent. */
   readonly credit?: ReactNode;
   /** `<li>` items: year, duration, size… */
   readonly facts: ReactNode;
   /** Main action, or what stands in for it */
   readonly primary: ReactNode;
-  /** Status banners of the movies screen, above the summary */
+  /** Status banners of the screen, above the summary */
   readonly notices?: ReactNode;
   readonly overview?: string;
+  /** Full-width content under the summary (the seasons and episodes of a series) */
+  readonly sections?: ReactNode;
   /** Dialogs of the page (confirmations) */
   readonly children?: ReactNode;
 }
 
 /**
- * Movie page, shown in the content area in place of the list: a backdrop header with the
- * poster, title, key facts and the main action, then the summary. Shared by the page of a
- * library movie and the page that adds a movie found by the search.
+ * Detail page of a movie or a series, shown in the content area in place of the list: a
+ * backdrop header with the poster, title, key facts and the main action, then the summary.
+ * Shared by the page of a library item and the page that adds an item found by the search.
  */
-export function MovieDetailLayout({
+export function MediaDetailLayout({
   title,
   fanartUrl,
   posterUrl,
@@ -134,49 +136,51 @@ export function MovieDetailLayout({
   primary,
   notices,
   overview,
+  sections,
   children,
-}: Readonly<MovieDetailLayoutProps>) {
+}: Readonly<MediaDetailLayoutProps>) {
   const backdropStatus = useImageStatus(fanartUrl);
 
   return (
     <article
-      className={`movie-detail${posterUrl ? ' movie-detail--with-poster' : ''}`}
-      aria-labelledby={MOVIE_DETAIL_HEADING_ID}
+      className={`media-detail${posterUrl ? ' media-detail--with-poster' : ''}`}
+      aria-labelledby={MEDIA_DETAIL_HEADING_ID}
     >
-      <header className="movie-detail-hero">
+      <header className="media-detail-hero">
         {fanartUrl && backdropStatus !== 'error' && (
           <div
-            className="movie-detail-backdrop"
+            className="media-detail-backdrop"
             data-status={backdropStatus}
             style={{ backgroundImage: `url(${fanartUrl})` }}
             aria-hidden="true"
           />
         )}
 
-        <div className="movie-detail-hero-inner">
-          {posterUrl && <img className="movie-detail-poster" src={posterUrl} alt="" decoding="async" />}
-          <div className="movie-detail-intro">
-            <h2 className="movie-detail-title" id={MOVIE_DETAIL_HEADING_ID} tabIndex={-1}>
+        <div className="media-detail-hero-inner">
+          {posterUrl && <img className="media-detail-poster" src={posterUrl} alt="" decoding="async" />}
+          <div className="media-detail-intro">
+            <h2 className="media-detail-title" id={MEDIA_DETAIL_HEADING_ID} tabIndex={-1}>
               {title}
             </h2>
-            {credit && <p className="movie-detail-credit">{credit}</p>}
-            <ul className="movie-detail-facts" aria-label="Informations">
+            {credit && <p className="media-detail-credit">{credit}</p>}
+            <ul className="media-detail-facts" aria-label="Informations">
               {facts}
             </ul>
-            <div className="movie-detail-primary">{primary}</div>
+            <div className="media-detail-primary">{primary}</div>
           </div>
         </div>
       </header>
 
-      <div className="movie-detail-body">
+      <div className="media-detail-body">
         {notices}
-        <section className="movie-detail-section" aria-labelledby="movie-detail-overview-title">
+        <section className="media-detail-section" aria-labelledby="media-detail-overview-title">
           {/* Heading for screen readers only: on screen, the text speaks for itself */}
-          <h3 className="sr-only" id="movie-detail-overview-title">
+          <h3 className="sr-only" id="media-detail-overview-title">
             Résumé
           </h3>
-          <p className="movie-detail-overview">{overview || 'Aucun résumé disponible.'}</p>
+          <p className="media-detail-overview">{overview || 'Aucun résumé disponible.'}</p>
         </section>
+        {sections && <div className="media-detail-wide">{sections}</div>}
       </div>
 
       {children}

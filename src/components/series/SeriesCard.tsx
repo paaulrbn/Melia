@@ -1,5 +1,7 @@
+import type { MouseEvent } from 'react';
 import { LookupSeries, Series, UnifiedQueueItem } from '../../types';
 import { getImageUrl } from '../../utils/media';
+import { formatSeasonCount } from '../../utils/series';
 import { Play, Plus } from 'lucide-react';
 import { Poster, ProgressBar } from '../ui';
 
@@ -8,7 +10,7 @@ interface SeriesCardProps {
   readonly localEpisodeCount?: number;
   readonly queueItems?: UnifiedQueueItem[];
   readonly isAddHint?: boolean;
-  readonly onClick: () => void;
+  readonly onClick: (event: MouseEvent<HTMLButtonElement>) => void;
 }
 
 export function SeriesCard({
@@ -27,12 +29,6 @@ export function SeriesCard({
     seasonCount = series.seasons.length;
   }
 
-  let seasonText = '';
-  if (seasonCount > 0) {
-    const plural = seasonCount > 1 ? 's' : '';
-    seasonText = `• ${seasonCount} saison${plural}`;
-  }
-
   // Active queue progress if any episode is in queue
   const activeQueue = queueItems[0];
   let serverProgress = 0;
@@ -44,14 +40,15 @@ export function SeriesCard({
     <button
       type="button"
       className="movie-card"
+      // Library poster: found again to take back the focus when its detail page closes
+      data-series-id={'id' in series ? series.id : undefined}
       onClick={onClick}
     >
       {posterUrl && <Poster src={posterUrl} alt={series.title} />}
       <div className="movie-overlay">
         <h3>{series.title}</h3>
-        <span className="year">
-          {series.year} {seasonText}
-        </span>
+        <span className="year">{series.year}</span>
+        {seasonCount > 0 && <span className="year">{formatSeasonCount(seasonCount)}</span>}
 
         {isAddHint && (
           <div className="mini-status add-hint">

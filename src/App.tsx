@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
 import { ChevronRight } from 'lucide-react';
-import { DownloadInfo, Episode, LookupMovie, Movie, Series, TabType, UnifiedQueueItem } from './types';
+import { DownloadInfo, Episode, LookupMovie, LookupSeries, Movie, Series, TabType, UnifiedQueueItem } from './types';
 import { useConfig } from './hooks/useConfig';
 import { useDownloads } from './hooks/useDownloads';
 import { useMovies } from './hooks/useMovies';
@@ -13,6 +13,12 @@ import { useBackForward } from './hooks/useBackForward';
 import { isEditableTarget, useSidebar } from './hooks/useSidebar';
 import { playVideo } from './services/player';
 import { MovieGroupKey, movieGroupHeadingId, movieGroupSectionId } from './utils/movieGroups';
+import {
+  SeriesGroupKey,
+  buildSeriesGroups,
+  seriesGroupHeadingId,
+  seriesGroupSectionId,
+} from './utils/seriesGroups';
 
 import { StatusBanner } from './components/common/StatusBanner';
 import { Sidebar } from './components/layout/Sidebar';
@@ -23,11 +29,11 @@ import { UpdateBanner } from './components/layout/UpdateBanner';
 import { WindowBar } from './components/layout/WindowBar';
 import { MoviesView } from './components/movies/MoviesView';
 import { MovieDetailView } from './components/movies/MovieDetailView';
-import { MOVIE_DETAIL_HEADING_ID } from './components/movies/MovieDetailLayout';
+import { MEDIA_DETAIL_HEADING_ID } from './components/media/MediaDetailLayout';
 import { AddMovieView } from './components/movies/AddMovieView';
 import { SeriesView } from './components/series/SeriesView';
-import { SeriesDetailModal } from './components/series/SeriesDetailModal';
-import { AddSeriesModal } from './components/series/AddSeriesModal';
+import { SeriesDetailView } from './components/series/SeriesDetailView';
+import { AddSeriesView } from './components/series/AddSeriesView';
 import { DownloadsView } from './components/downloads/DownloadsView';
 import { SettingsView } from './components/settings/SettingsView';
 import { ConfigImportModal } from './components/settings/ConfigImportModal';
@@ -37,11 +43,32 @@ import './App.css';
 
 const SIDEBAR_ID = 'app-sidebar';
 
-/** Content of the movie page: a library movie, or a search result to add */
-type DetailPage = { kind: 'movie'; movie: Movie } | { kind: 'add'; movie: LookupMovie };
+/**
+ * Content of the detail page: a library movie or series, or a search result to add.
+ * Only one is open at a time.
+ */
+type DetailPage =
+  | { kind: 'movie'; movie: Movie }
+  | { kind: 'add'; movie: LookupMovie }
+  | { kind: 'series'; series: Series }
+  | { kind: 'add-series'; series: LookupSeries };
 
 function detailPageKey(page: DetailPage): string {
-  return page.kind === 'movie' ? `movie-${page.movie.id}` : `add-${page.movie.tmdbId}`;
+  switch (page.kind) {
+    case 'movie':
+      return `movie-${page.movie.id}`;
+    case 'add':
+      return `add-${page.movie.tmdbId}`;
+    case 'series':
+      return `series-${page.series.id}`;
+    case 'add-series':
+      return `add-series-${page.series.tvdbId}`;
+  }
+}
+
+/** The object the page shows: a new one means the page content changed. */
+function detailPageSubject(page: DetailPage): object {
+  return page.kind === 'movie' || page.kind === 'add' ? page.movie : page.series;
 }
 
 /** Page left with "back": what it showed and the page it was opened from. */
@@ -276,48 +303,66 @@ function App() {
 
   const sidebar = useSidebar();
 
-  // Movie page: shown in the content area in place of the list, which stays mounted (and
-  // scrolled where it was) underneath. Either a library movie, or a movie found by the
-  // search that can be added; never both.
+  // Detail page: shown in the content area in place of the list, which stays mounted (and
+  // scrolled where it was) underneath. A library movie or series, or one found by the
+  // search that can be added; never two at once.
   const { selectedMovie, setSelectedMovie, selectMovie, addingMovie, openAddMovie, closeAddMovie } =
     moviesManager;
-  // Page the movie page was opened from (Films, Téléchargements): it opens over that page,
-  // which stays selected in the sidebar, and "back" returns to it
+  const { selectedSeries, selectSeries, addingSeries, openAddSeries, closeAddSeries } = seriesManager;
+  // Page the detail page was opened from (Films, Séries, Téléchargements): it opens over
+  // that page, which stays selected in the sidebar, and "back" returns to it
   const [detailFrom, setDetailFrom] = useState<TabType>('movies');
   // Library refreshes (queue end, focus, every 5 min) reach the open page
   const liveMovie = selectedMovie
     ? (moviesManager.movies.find(m => m.id === selectedMovie.id) ?? selectedMovie)
     : null;
+  const liveSeries = selectedSeries
+    ? (seriesManager.series.find(s => s.id === selectedSeries.id) ?? selectedSeries)
+    : null;
   const openPage = useMemo<DetailPage | null>(() => {
     if (activeTab !== detailFrom) return null;
     if (liveMovie) return { kind: 'movie', movie: liveMovie };
     if (addingMovie) return { kind: 'add', movie: addingMovie };
+    if (liveSeries) return { kind: 'series', series: liveSeries };
+    if (addingSeries) return { kind: 'add-series', series: addingSeries };
     return null;
-  }, [activeTab, detailFrom, liveMovie, addingMovie]);
-  const isMovieDetailOpen = openPage !== null;
+  }, [activeTab, detailFrom, liveMovie, addingMovie, liveSeries, addingSeries]);
+  const isDetailOpen = openPage !== null;
+  const isSeriesDetail = openPage?.kind === 'series' || openPage?.kind === 'add-series';
   // Kept after closing so the page can slide out, then dropped (see onTransitionEnd)
   const [closingPage, setClosingPage] = useState<DetailPage | null>(null);
-  if (openPage && openPage.movie !== closingPage?.movie) setClosingPage(openPage);
+  if (openPage && detailPageSubject(openPage) !== (closingPage && detailPageSubject(closingPage))) {
+    setClosingPage(openPage);
+  }
   const detailPage = openPage ?? closingPage;
   const detailMovie = detailPage?.kind === 'movie' ? detailPage.movie : null;
+  const detailSeries = detailPage?.kind === 'series' ? detailPage.series : null;
   const openPageKey = openPage ? detailPageKey(openPage) : null;
   // Movie added from the search a moment ago: its page says the server search has started
   const [justAddedMovieId, setJustAddedMovieId] = useState<number | null>(null);
 
   const listPaneRef = useRef<HTMLDivElement>(null);
   const detailPaneRef = useRef<HTMLDivElement>(null);
-  // Poster that opened the page, and (on return) the library movie whose poster takes the
-  // focus back when that poster is gone
+  // Poster that opened the page, and (on return) the selector of the library item whose
+  // poster takes the focus back when that poster is gone
   const detailTriggerRef = useRef<HTMLElement | null>(null);
-  const focusReturnRef = useRef<{ movieId: number | null } | null>(null);
+  const focusReturnRef = useRef<{ selector: string | null } | null>(null);
   // Bumped by every page change: an addition that ends later only moves on if nothing changed
   const pageChangeRef = useRef(0);
 
   // Page left with "back", reopened by "forward" (mouse button, swipe), like a browser,
-  // over the page it was opened from. Only the movie page is in this history, not the
-  // tabs: any other way of leaving it (tab, sidebar group, search, another movie,
+  // over the page it was opened from. Only the detail page is in this history, not the
+  // tabs: any other way of leaving it (tab, sidebar group, search, another page,
   // deletion) forgets it.
   const forwardPageRef = useRef<ForwardEntry | null>(null);
+
+  // Nothing selected, nothing being added: the state every page change starts from
+  const clearDetailState = useCallback(() => {
+    setSelectedMovie(null);
+    closeAddMovie();
+    void selectSeries(null);
+    closeAddSeries();
+  }, [setSelectedMovie, closeAddMovie, selectSeries, closeAddSeries]);
 
   /** `from`: the page it opens over and goes back to (Films unless said otherwise). */
   const openMovieDetail = useCallback(
@@ -326,12 +371,12 @@ function App() {
       forwardPageRef.current = null;
       detailTriggerRef.current = trigger ?? null;
       setJustAddedMovieId(null);
-      closeAddMovie();
+      clearDetailState();
       setDetailFrom(from);
       setActiveTab(from);
       void selectMovie(movie);
     },
-    [selectMovie, closeAddMovie]
+    [selectMovie, clearDetailState]
   );
 
   const openMovieDetailFromDownloads = useCallback(
@@ -345,57 +390,119 @@ function App() {
       pageChangeRef.current += 1;
       forwardPageRef.current = null;
       detailTriggerRef.current = trigger ?? null;
-      setSelectedMovie(null);
+      clearDetailState();
       setDetailFrom('movies');
       setActiveTab('movies');
       openAddMovie(movie);
     },
-    [setSelectedMovie, openAddMovie]
+    [clearDetailState, openAddMovie]
+  );
+
+  /** `from`: the page it opens over and goes back to (Séries unless said otherwise). */
+  const openSeriesDetail = useCallback(
+    (series: Series, trigger?: HTMLElement, from: TabType = 'series') => {
+      pageChangeRef.current += 1;
+      forwardPageRef.current = null;
+      detailTriggerRef.current = trigger ?? null;
+      clearDetailState();
+      setDetailFrom(from);
+      setActiveTab(from);
+      void selectSeries(series);
+    },
+    [selectSeries, clearDetailState]
+  );
+
+  const openSeriesDetailFromDownloads = useCallback(
+    (series: Series, trigger?: HTMLElement) => openSeriesDetail(series, trigger, 'downloads'),
+    [openSeriesDetail]
+  );
+
+  // Search results only exist on the Séries page
+  const openAddSeriesDetail = useCallback(
+    (series: LookupSeries, trigger?: HTMLElement) => {
+      pageChangeRef.current += 1;
+      forwardPageRef.current = null;
+      detailTriggerRef.current = trigger ?? null;
+      clearDetailState();
+      setDetailFrom('series');
+      setActiveTab('series');
+      void openAddSeries(series);
+    },
+    [clearDetailState, openAddSeries]
   );
 
   /** `restoreFocus`: going back. A tab, a group or the search keep their own focus. */
-  const closeMovieDetail = useCallback(
+  const closeDetail = useCallback(
     (restoreFocus: boolean) => {
       pageChangeRef.current += 1;
       forwardPageRef.current = null;
-      focusReturnRef.current = restoreFocus ? { movieId: selectedMovie?.id ?? null } : null;
-      setSelectedMovie(null);
-      closeAddMovie();
+      let selector: string | null = null;
+      if (selectedMovie) selector = `[data-movie-id="${selectedMovie.id}"]`;
+      else if (selectedSeries) selector = `[data-series-id="${selectedSeries.id}"]`;
+      focusReturnRef.current = restoreFocus ? { selector } : null;
+      clearDetailState();
     },
-    [selectedMovie, setSelectedMovie, closeAddMovie]
+    [selectedMovie, selectedSeries, clearDetailState]
   );
 
   // One path for every "back": header button, Escape, mouse button, trackpad swipe
   const goBack = useCallback(() => {
     if (!openPage) return;
-    closeMovieDetail(true);
+    closeDetail(true);
     forwardPageRef.current = { page: openPage, from: detailFrom };
-  }, [openPage, detailFrom, closeMovieDetail]);
+  }, [openPage, detailFrom, closeDetail]);
 
   // Only from the page it was left for: a page opened from the downloads does not
   // reappear over the movies, and the other way round
   const movies = moviesManager.movies;
+  const seriesList = seriesManager.series;
   const goForward = useCallback(() => {
     const entry = forwardPageRef.current;
-    if (!entry || activeTab !== entry.from || isMovieDetailOpen) return;
+    if (!entry || activeTab !== entry.from || isDetailOpen) return;
     const { page, from } = entry;
-    if (page.kind === 'add') {
-      // Added in the meantime: its library page instead
-      const added = movies.find(m => m.tmdbId === page.movie.tmdbId);
-      if (added) openMovieDetail(added, undefined, from);
-      else openAddMovieDetail(page.movie);
-      return;
+    // Added in the meantime: its library page instead. Removed from the library in the
+    // meantime: nothing to reopen.
+    switch (page.kind) {
+      case 'add': {
+        const added = movies.find(m => m.tmdbId === page.movie.tmdbId);
+        if (added) openMovieDetail(added, undefined, from);
+        else openAddMovieDetail(page.movie);
+        return;
+      }
+      case 'movie': {
+        const current = movies.find(m => m.id === page.movie.id);
+        if (current) openMovieDetail(current, undefined, from);
+        else forwardPageRef.current = null;
+        return;
+      }
+      case 'add-series': {
+        const added = seriesList.find(s => s.tvdbId === page.series.tvdbId);
+        if (added) openSeriesDetail(added, undefined, from);
+        else openAddSeriesDetail(page.series);
+        return;
+      }
+      case 'series': {
+        const current = seriesList.find(s => s.id === page.series.id);
+        if (current) openSeriesDetail(current, undefined, from);
+        else forwardPageRef.current = null;
+        return;
+      }
     }
-    // Removed from the library in the meantime: nothing to reopen
-    const current = movies.find(m => m.id === page.movie.id);
-    if (current) openMovieDetail(current, undefined, from);
-    else forwardPageRef.current = null;
-  }, [activeTab, isMovieDetailOpen, movies, openMovieDetail, openAddMovieDetail]);
+  }, [
+    activeTab,
+    isDetailOpen,
+    movies,
+    seriesList,
+    openMovieDetail,
+    openAddMovieDetail,
+    openSeriesDetail,
+    openAddSeriesDetail,
+  ]);
 
   const canGoForward = useCallback(() => {
     const entry = forwardPageRef.current;
-    return entry !== null && activeTab === entry.from && !isMovieDetailOpen;
-  }, [activeTab, isMovieDetailOpen]);
+    return entry !== null && activeTab === entry.from && !isDetailOpen;
+  }, [activeTab, isDetailOpen]);
 
   const appRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLElement>(null);
@@ -406,7 +513,7 @@ function App() {
       if (source === 'swipe') setClosingPage(null);
     },
     onForward: goForward,
-    canGoBack: isMovieDetailOpen,
+    canGoBack: isDetailOpen,
     canGoForward,
     feedbackRef: appRef,
     stageRef: contentRef,
@@ -414,11 +521,11 @@ function App() {
 
   // Opening: top of the page, focus on its title so it is announced. Closing: focus back
   // on what opened it (poster, download row), without scrolling the page, which kept its
-  // position; else on that movie elsewhere on the page, else on the page heading.
+  // position; else on that movie or series elsewhere on the page, else on the page heading.
   useLayoutEffect(() => {
     if (openPageKey !== null) {
       if (detailPaneRef.current) detailPaneRef.current.scrollTop = 0;
-      document.getElementById(MOVIE_DETAIL_HEADING_ID)?.focus({ preventScroll: true });
+      document.getElementById(MEDIA_DETAIL_HEADING_ID)?.focus({ preventScroll: true });
       return;
     }
     const focusReturn = focusReturnRef.current;
@@ -428,57 +535,18 @@ function App() {
     const trigger = detailTriggerRef.current;
     let target: HTMLElement | null = null;
     if (trigger && list.contains(trigger) && isRendered(trigger)) target = trigger;
-    else if (focusReturn.movieId !== null) {
-      const candidates = list.querySelectorAll<HTMLElement>(`[data-movie-id="${focusReturn.movieId}"]`);
+    else if (focusReturn.selector !== null) {
+      const candidates = list.querySelectorAll<HTMLElement>(focusReturn.selector);
       target = Array.from(candidates).find(isRendered) ?? null;
     }
     target ??= document.getElementById(PAGE_HEADING_ID);
     target?.focus({ preventScroll: true });
   }, [openPageKey]);
 
-  // Series page (a modal over the current page): same return of the focus. Closing gives it
-  // to what opened it (series row) if still there, else to that series elsewhere on the
-  // page, else to the page heading.
-  const { selectedSeries, selectSeries } = seriesManager;
-  const selectedSeriesId = selectedSeries?.id ?? null;
-  const seriesTriggerRef = useRef<HTMLElement | null>(null);
-  const seriesFocusReturnRef = useRef<{ seriesId: number | null } | null>(null);
-
-  const openSeries = useCallback(
-    (series: Series, trigger?: HTMLElement) => {
-      seriesTriggerRef.current = trigger ?? null;
-      seriesFocusReturnRef.current = null;
-      void selectSeries(series);
-    },
-    [selectSeries]
-  );
-
-  const closeSeries = useCallback(() => {
-    seriesFocusReturnRef.current = { seriesId: selectedSeriesId };
-    void selectSeries(null);
-  }, [selectedSeriesId, selectSeries]);
-
-  useLayoutEffect(() => {
-    if (selectedSeriesId !== null) return;
-    const focusReturn = seriesFocusReturnRef.current;
-    seriesFocusReturnRef.current = null;
-    const list = listPaneRef.current;
-    if (focusReturn === null || !list) return;
-    const trigger = seriesTriggerRef.current;
-    let target: HTMLElement | null = null;
-    if (trigger && list.contains(trigger) && isRendered(trigger)) target = trigger;
-    else if (focusReturn.seriesId !== null) {
-      const candidates = list.querySelectorAll<HTMLElement>(`[data-series-id="${focusReturn.seriesId}"]`);
-      target = Array.from(candidates).find(isRendered) ?? null;
-    }
-    target ??= document.getElementById(PAGE_HEADING_ID);
-    target?.focus({ preventScroll: true });
-  }, [selectedSeriesId]);
-
   // Escape goes back to the list, unless a confirmation is open or the key belongs to a field.
   // Capture phase: runs before the dialogs' own Escape handlers can remove them.
   useEffect(() => {
-    if (!isMovieDetailOpen) return;
+    if (!isDetailOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return;
       if (document.querySelector('dialog[open]') || isEditableTarget(event.target)) return;
@@ -487,13 +555,13 @@ function App() {
     };
     window.addEventListener('keydown', onKeyDown, true);
     return () => window.removeEventListener('keydown', onKeyDown, true);
-  }, [isMovieDetailOpen, goBack]);
+  }, [isDetailOpen, goBack]);
 
   // Library groups stay listed in the sidebar on every screen; only the movies library
   // (no search in progress, no detail page) shows the sections they point to.
   const movieGroups = moviesManager.movieGroups;
   const isMovieLibraryShown =
-    activeTab === 'movies' && searchManager.searchQuery.trim().length === 0 && !isMovieDetailOpen;
+    activeTab === 'movies' && searchManager.searchQuery.trim().length === 0 && !isDetailOpen;
   const movieSectionIds = useMemo(
     () => movieGroups.map(group => movieGroupSectionId(group.key)),
     [movieGroups]
@@ -507,27 +575,49 @@ function App() {
     ? (movieGroups.find(group => movieGroupSectionId(group.key) === activeSectionId)?.key ?? null)
     : null;
 
-  const scrollToMovieGroup = useCallback((key: MovieGroupKey, smooth: boolean) => {
-    const section = document.getElementById(movieGroupSectionId(key));
+  // Same for the series library
+  const seriesGroups = useMemo(
+    () => buildSeriesGroups(seriesManager.localSeries, seriesManager.serverSeries, seriesManager.unavailableSeries),
+    [seriesManager.localSeries, seriesManager.serverSeries, seriesManager.unavailableSeries]
+  );
+  const isSeriesLibraryShown =
+    activeTab === 'series' && searchManager.seriesSearchQuery.trim().length === 0 && !isDetailOpen;
+  const seriesSectionIds = useMemo(
+    () => seriesGroups.map(group => seriesGroupSectionId(group.key)),
+    [seriesGroups]
+  );
+  const activeSeriesSectionId = useScrollSpy(
+    listPaneRef,
+    seriesSectionIds,
+    isSeriesLibraryShown && seriesSectionIds.length > 0
+  );
+  const activeSeriesGroup = isSeriesLibraryShown
+    ? (seriesGroups.find(group => seriesGroupSectionId(group.key) === activeSeriesSectionId)?.key ?? null)
+    : null;
+
+  const scrollToSection = useCallback((sectionId: string, headingId: string, smooth: boolean) => {
+    const section = document.getElementById(sectionId);
     if (!section) return;
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     section.scrollIntoView({ behavior: smooth && !reduceMotion ? 'smooth' : 'auto', block: 'start' });
     // Keyboard users continue from the section they jumped to
-    document.getElementById(movieGroupHeadingId(key))?.focus({ preventScroll: true });
+    document.getElementById(headingId)?.focus({ preventScroll: true });
   }, []);
 
   // Group picked from another screen or over search results: open the library first,
   // then scroll once its section is in the DOM (checked after each render, before paint).
   const [pendingMovieGroup, setPendingMovieGroup] = useState<MovieGroupKey | null>(null);
+  const [pendingSeriesGroup, setPendingSeriesGroup] = useState<SeriesGroupKey | null>(null);
 
   // Any tab, "Films" included, closes the detail page
   const selectTab = useCallback(
     (tab: TabType) => {
       setPendingMovieGroup(null);
-      closeMovieDetail(false);
+      setPendingSeriesGroup(null);
+      closeDetail(false);
       setActiveTab(tab);
     },
-    [closeMovieDetail]
+    [closeDetail]
   );
 
   const { searchQuery, clearSearch, handleSearch } = searchManager;
@@ -542,19 +632,46 @@ function App() {
     openMovieDetail(created);
     setJustAddedMovieId(created.id);
   };
+
+  // Same for a series: it joins the library and its page takes over
+  const handleAddSeries = async () => {
+    const pageChange = pageChangeRef.current;
+    const created = await seriesManager.handleAddSeries();
+    if (!created || pageChangeRef.current !== pageChange) return;
+    searchManager.clearSeriesSearch();
+    openSeriesDetail(created);
+  };
   const handleSelectMovieGroup = useCallback(
     (key: MovieGroupKey) => {
       forwardPageRef.current = null;
+      setPendingSeriesGroup(null);
       if (isMovieLibraryShown) {
-        scrollToMovieGroup(key, true);
+        scrollToSection(movieGroupSectionId(key), movieGroupHeadingId(key), true);
         return;
       }
       if (searchQuery) clearSearch();
-      closeMovieDetail(false);
+      closeDetail(false);
       setActiveTab('movies');
       setPendingMovieGroup(key);
     },
-    [isMovieLibraryShown, scrollToMovieGroup, searchQuery, clearSearch, closeMovieDetail]
+    [isMovieLibraryShown, scrollToSection, searchQuery, clearSearch, closeDetail]
+  );
+
+  const { seriesSearchQuery, clearSeriesSearch } = searchManager;
+  const handleSelectSeriesGroup = useCallback(
+    (key: SeriesGroupKey) => {
+      forwardPageRef.current = null;
+      setPendingMovieGroup(null);
+      if (isSeriesLibraryShown) {
+        scrollToSection(seriesGroupSectionId(key), seriesGroupHeadingId(key), true);
+        return;
+      }
+      if (seriesSearchQuery) clearSeriesSearch();
+      closeDetail(false);
+      setActiveTab('series');
+      setPendingSeriesGroup(key);
+    },
+    [isSeriesLibraryShown, scrollToSection, seriesSearchQuery, clearSeriesSearch, closeDetail]
   );
 
   useLayoutEffect(() => {
@@ -566,8 +683,19 @@ function App() {
     if (!document.getElementById(movieGroupSectionId(pendingMovieGroup))) return;
     setPendingMovieGroup(null);
     // New screen: land on the section directly instead of scrolling through it
-    scrollToMovieGroup(pendingMovieGroup, false);
-  }, [pendingMovieGroup, isMovieLibraryShown, movieGroups, scrollToMovieGroup]);
+    scrollToSection(movieGroupSectionId(pendingMovieGroup), movieGroupHeadingId(pendingMovieGroup), false);
+  }, [pendingMovieGroup, isMovieLibraryShown, movieGroups, scrollToSection]);
+
+  useLayoutEffect(() => {
+    if (pendingSeriesGroup === null || !isSeriesLibraryShown) return;
+    if (!seriesGroups.some(group => group.key === pendingSeriesGroup)) {
+      setPendingSeriesGroup(null);
+      return;
+    }
+    if (!document.getElementById(seriesGroupSectionId(pendingSeriesGroup))) return;
+    setPendingSeriesGroup(null);
+    scrollToSection(seriesGroupSectionId(pendingSeriesGroup), seriesGroupHeadingId(pendingSeriesGroup), false);
+  }, [pendingSeriesGroup, isSeriesLibraryShown, seriesGroups, scrollToSection]);
 
   let pageSearch: PageToolbarSearch | undefined;
   if (activeTab === 'movies') {
@@ -577,11 +705,11 @@ function App() {
       label: 'Rechercher un film',
       placeholder: 'Rechercher un film…',
       onChange: term => {
-        closeMovieDetail(false);
+        closeDetail(false);
         handleSearch(term);
       },
       onClear: () => {
-        closeMovieDetail(false);
+        closeDetail(false);
         clearSearch();
       },
     };
@@ -590,22 +718,29 @@ function App() {
       query: searchManager.seriesSearchQuery,
       label: 'Rechercher une série',
       placeholder: 'Rechercher une série…',
-      onChange: searchManager.handleSeriesSearch,
-      onClear: searchManager.clearSeriesSearch,
+      onChange: term => {
+        closeDetail(false);
+        searchManager.handleSeriesSearch(term);
+      },
+      onClear: () => {
+        closeDetail(false);
+        searchManager.clearSeriesSearch();
+      },
     };
   }
 
-  // Shown at the top of whichever page is visible, the movie detail page included
+  // Shown at the top of whichever page is visible, the detail page included (Radarr's
+  // for a movie page, Sonarr's for a series page, whichever page it was opened from)
   const statusBanners = (
     <>
-      {(activeTab === 'movies' || isMovieDetailOpen) && moviesManager.loadError && (
+      {(activeTab === 'movies' || (isDetailOpen && !isSeriesDetail)) && moviesManager.loadError && (
         <StatusBanner
           title="Radarr injoignable"
           detail={moviesManager.loadError}
           onRetry={() => void moviesManager.loadMovies()}
         />
       )}
-      {activeTab === 'series' && seriesManager.loadError && (
+      {(activeTab === 'series' || isSeriesDetail) && seriesManager.loadError && (
         <StatusBanner
           title="Sonarr injoignable"
           detail={seriesManager.loadError}
@@ -632,17 +767,17 @@ function App() {
     </>
   );
 
-  // Kept on every page a movie page can open over, so the button can fade in and out;
-  // it names the current page, which is the one the movie page goes back to
+  // Kept on every page a detail page can open over, so the button can fade in and out;
+  // it names the current page, which is the one the detail page goes back to
   const backLabel = DETAIL_BACK_LABELS[activeTab];
 
   const appClassName = `melia-app${sidebar.isCollapsed ? ' is-sidebar-collapsed' : ''}`;
 
   return (
     <div className={appClassName} ref={appRef}>
-      {/* Top row: window controls, logo and toggle, the back button on the movie detail
-          page, the page tabs while the sidebar is hidden, and the search. Its empty space
-          moves the window. */}
+      {/* Top row: window controls, logo and toggle, the back button on a detail page, the
+          page tabs while the sidebar is hidden, and the search. Its empty space moves the
+          window. */}
       <PageToolbar
         leading={
           <WindowBar
@@ -654,8 +789,11 @@ function App() {
         back={
           backLabel
             ? {
-                isShown: isMovieDetailOpen,
-                label: openPage?.kind === 'add' ? 'Retour aux résultats' : backLabel,
+                isShown: isDetailOpen,
+                label:
+                  openPage?.kind === 'add' || openPage?.kind === 'add-series'
+                    ? 'Retour aux résultats'
+                    : backLabel,
                 text: PAGE_TITLES[activeTab],
                 onBack: goBack,
               }
@@ -683,22 +821,26 @@ function App() {
         movieGroups={movieGroups}
         activeMovieGroup={activeMovieGroup}
         onSelectMovieGroup={handleSelectMovieGroup}
+        seriesGroups={seriesGroups}
+        activeSeriesGroup={activeSeriesGroup}
+        onSelectSeriesGroup={handleSelectSeriesGroup}
       />
 
-      {/* Two pages stacked in the content area: the tab views, and the movie detail page
-          that slides in over them. Only the visible one scrolls and takes the focus. */}
+      {/* Two pages stacked in the content area: the tab views, and the detail page (movie
+          or series) that slides in over them. Only the visible one scrolls and takes the
+          focus. */}
       <main
         className="melia-content t-page-slide"
-        data-page={isMovieDetailOpen ? '2' : '1'}
+        data-page={isDetailOpen ? '2' : '1'}
         data-sidebar-follow=""
         ref={contentRef}
       >
-        <div className="melia-page t-page" data-page-id="1" ref={listPaneRef} inert={isMovieDetailOpen}>
+        <div className="melia-page t-page" data-page-id="1" ref={listPaneRef} inert={isDetailOpen}>
           {/* Page name for screen readers only: on screen, the sidebar or the tabs show it */}
           <h2 className="sr-only" id={PAGE_HEADING_ID} tabIndex={-1}>
             {PAGE_TITLES[activeTab]}
           </h2>
-          {!isMovieDetailOpen && statusBanners}
+          {!isDetailOpen && statusBanners}
 
           <div style={{ display: activeTab === 'movies' ? 'block' : 'none' }}>
             <MoviesView
@@ -726,14 +868,12 @@ function App() {
               searchResults={searchManager.seriesSearchResults}
               isSearching={searchManager.isSeriesSearching}
               series={seriesManager.series}
-              localSeries={seriesManager.localSeries}
-              serverSeries={seriesManager.serverSeries}
-              unavailableSeries={seriesManager.unavailableSeries}
+              seriesGroups={seriesGroups}
               downloads={downloadsManager.downloads}
               sonarrQueue={seriesManager.sonarrQueue}
               findInLibrary={seriesManager.findInLibrary}
-              onSelectSeries={openSeries}
-              onOpenAddSeries={seriesManager.openAddSeries}
+              onSelectSeries={openSeriesDetail}
+              onOpenAddSeries={openAddSeriesDetail}
               isConfigLoaded={configManager.configLoaded}
               isConfigured={seriesManager.isConfigured}
               hasLoaded={seriesManager.hasLoaded}
@@ -754,7 +894,7 @@ function App() {
               onDelete={downloadsManager.handleDeleteDownload}
               onCancelServerQueue={handleCancelServerQueueItem}
               onSelectMovie={openMovieDetailFromDownloads}
-              onSelectSeries={openSeries}
+              onSelectSeries={openSeriesDetailFromDownloads}
             />
           </div>
 
@@ -800,10 +940,10 @@ function App() {
           className="melia-page t-page"
           data-page-id="2"
           ref={detailPaneRef}
-          inert={!isMovieDetailOpen}
+          inert={!isDetailOpen}
           onTransitionEnd={event => {
             if (event.target !== event.currentTarget || event.propertyName !== 'opacity') return;
-            if (!isMovieDetailOpen) setClosingPage(null);
+            if (!isDetailOpen) setClosingPage(null);
           }}
         >
           {detailPage?.kind === 'add' && (
@@ -813,10 +953,23 @@ function App() {
               qualityProfiles={moviesManager.qualityProfiles}
               selectedQuality={moviesManager.selectedQuality}
               setSelectedQuality={moviesManager.setSelectedQuality}
-              isAdding={isMovieDetailOpen && moviesManager.isAddingMovie}
-              error={isMovieDetailOpen ? moviesManager.addMovieError : null}
-              notices={isMovieDetailOpen ? statusBanners : undefined}
+              isAdding={isDetailOpen && moviesManager.isAddingMovie}
+              error={isDetailOpen ? moviesManager.addMovieError : null}
+              notices={isDetailOpen ? statusBanners : undefined}
               onAdd={handleAddMovie}
+            />
+          )}
+          {detailPage?.kind === 'add-series' && (
+            <AddSeriesView
+              key={detailPageKey(detailPage)}
+              series={detailPage.series}
+              qualityProfiles={seriesManager.qualityProfiles}
+              selectedQuality={seriesManager.selectedQuality}
+              setSelectedQuality={seriesManager.setSelectedQuality}
+              isAdding={isDetailOpen && seriesManager.isAddingSeries}
+              error={isDetailOpen ? seriesManager.addSeriesError : null}
+              notices={isDetailOpen ? statusBanners : undefined}
+              onAdd={handleAddSeries}
             />
           )}
           {detailMovie && (
@@ -828,9 +981,9 @@ function App() {
               queueItem={moviesManager.radarrQueue[detailMovie.id]}
               movieStatus={moviesManager.getMovieStatus(detailMovie)}
               config={configManager.config}
-              notices={isMovieDetailOpen ? statusBanners : undefined}
+              notices={isDetailOpen ? statusBanners : undefined}
               // After a deletion: back to the list, nothing to reopen
-              onBack={() => closeMovieDetail(true)}
+              onBack={() => closeDetail(true)}
               onDownload={m => downloadsManager.handleDownloadMovie(m, configManager.config)}
               onCancelDownload={downloadsManager.handleCancelDownload}
               onPlay={playVideo}
@@ -839,6 +992,31 @@ function App() {
               onCancelServerQueue={moviesManager.handleCancelQueueItem}
               qualityProfiles={moviesManager.qualityProfiles}
               onChangeQuality={moviesManager.handleChangeMovieQuality}
+            />
+          )}
+          {detailSeries && (
+            <SeriesDetailView
+              key={`series-${detailSeries.id}`}
+              series={detailSeries}
+              episodes={seriesManager.episodesCache[detailSeries.id] ?? []}
+              isLoadingEpisodes={seriesManager.isLoadingEpisodes}
+              downloads={downloadsManager.downloads}
+              sonarrQueue={seriesManager.sonarrQueue}
+              config={configManager.config}
+              notices={isDetailOpen ? statusBanners : undefined}
+              // After a deletion: back to the list, nothing to reopen
+              onBack={() => closeDetail(true)}
+              onPlay={playVideo}
+              onDownloadEpisode={(s, ep) =>
+                downloadsManager.handleDownloadEpisode(s, ep, configManager.config)
+              }
+              onCancelDownload={downloadsManager.handleCancelDownload}
+              onDeleteDownload={downloadsManager.handleDeleteDownload}
+              onDeleteSeries={seriesManager.handleDeleteSeries}
+              onDeleteEpisodeFile={seriesManager.handleDeleteEpisodeFile}
+              onCancelServerQueue={handleCancelServerQueueItem}
+              onSearchEpisode={seriesManager.handleSearchEpisode}
+              onSearchSeason={seriesManager.handleSearchSeason}
             />
           )}
         </div>
@@ -855,46 +1033,6 @@ function App() {
         isInstalling={updater.isInstalling}
         onInstall={updater.handleInstall}
         onDismiss={updater.dismissUpdate}
-      />
-
-      {/* Series Modals */}
-      <SeriesDetailModal
-        series={seriesManager.selectedSeries}
-        episodes={seriesManager.selectedSeriesEpisodes}
-        isLoadingEpisodes={seriesManager.isLoadingEpisodes}
-        downloads={downloadsManager.downloads}
-        sonarrQueue={seriesManager.sonarrQueue}
-        config={configManager.config}
-        onClose={closeSeries}
-        onPlayStream={playVideo}
-        onPlayLocal={playVideo}
-        onDownloadEpisode={(s, ep) =>
-          downloadsManager.handleDownloadEpisode(s, ep, configManager.config)
-        }
-        onCancelDownload={downloadsManager.handleCancelDownload}
-        onDeleteDownload={downloadsManager.handleDeleteDownload}
-        onDeleteSeries={seriesManager.handleDeleteSeries}
-        onDeleteEpisodeFile={seriesManager.handleDeleteEpisodeFile}
-        onCancelServerQueue={handleCancelServerQueueItem}
-        onRefreshEpisodes={seriesManager.refreshCurrentEpisodes}
-        onSearchEpisode={seriesManager.handleSearchEpisode}
-        onSearchSeason={seriesManager.handleSearchSeason}
-      />
-
-      <AddSeriesModal
-        series={seriesManager.addingSeries}
-        qualityProfiles={seriesManager.qualityProfiles}
-        selectedQuality={seriesManager.selectedQuality}
-        setSelectedQuality={seriesManager.setSelectedQuality}
-        isAdding={seriesManager.isAddingSeries}
-        error={seriesManager.addSeriesError}
-        onAdd={async () => {
-          const success = await seriesManager.handleAddSeries();
-          if (success) {
-            searchManager.clearSeriesSearch();
-          }
-        }}
-        onClose={seriesManager.closeAddSeries}
       />
 
       <ConfigImportModal

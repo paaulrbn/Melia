@@ -19,7 +19,7 @@ import { getImageUrl, getStreamUrl } from '../../utils/media';
 import { describeUpcomingRelease, isMovieUpcoming } from '../../utils/release';
 import { formatTimeLeft, parseLocalTimeLeft, parseQueueTimeLeft } from '../../utils/transfer';
 import { ConfirmModal } from '../common/ConfirmModal';
-import { MovieDetailLayout, QualityPicker, TransferStatus } from './MovieDetailLayout';
+import { MediaDetailLayout, QualityPicker, TransferStatus } from '../media/MediaDetailLayout';
 
 interface MovieDetailViewProps {
   readonly movie: Movie;
@@ -49,7 +49,7 @@ function localFilename(movie: Movie): string {
 }
 
 /**
- * Page of a library movie (layout in MovieDetailLayout). The backdrop header holds
+ * Page of a library movie (layout in MediaDetailLayout). The backdrop header holds
  * everything needed at a glance: poster, title, director, key facts and the main action
  * (play, or what stands in for it: server progress, release date, quality and new
  * search). The summary follows below.
@@ -103,7 +103,7 @@ export function MovieDetailView({
   const deleteButton = (
     <button
       type="button"
-      className="movie-detail-quiet movie-detail-quiet--icon movie-detail-quiet--danger"
+      className="media-detail-quiet media-detail-quiet--icon media-detail-quiet--danger"
       onClick={() => setShowDeleteConfirm(true)}
       title={deleteLabel}
       aria-label={deleteLabel}
@@ -116,7 +116,7 @@ export function MovieDetailView({
   const roundButton = (label: string, icon: ReactNode, onClick: () => void, danger = false) => (
     <button
       type="button"
-      className={`movie-detail-quiet movie-detail-quiet--icon${danger ? ' movie-detail-quiet--danger' : ''}`}
+      className={`media-detail-quiet media-detail-quiet--icon${danger ? ' media-detail-quiet--danger' : ''}`}
       onClick={onClick}
       title={label}
       aria-label={label}
@@ -138,7 +138,7 @@ export function MovieDetailView({
 
     return (
       <TransferStatus
-        id="movie-detail-queue"
+        id="media-detail-queue"
         title="Téléchargement sur le serveur"
         details={details}
         progress={hasStarted ? (downloaded / item.size) * 100 : null}
@@ -173,37 +173,37 @@ export function MovieDetailView({
     else if (qualitySearchOk === false) qualityStatus = 'Échec de la modification';
 
     // Just added: the server search has only started, "not found" would be premature
-    let stateIcon = <SearchX className="movie-detail-state-icon" size={20} aria-hidden="true" />;
+    let stateIcon = <SearchX className="media-detail-state-icon" size={20} aria-hidden="true" />;
     let stateTitle = 'Introuvable dans cette qualité';
     let stateDetail =
       'Aucune version de ce film n’a été trouvée pour cette qualité. Essayez-en une autre et relancez la recherche.';
     if (isUpcoming) {
-      stateIcon = <CalendarClock className="movie-detail-state-icon" size={20} aria-hidden="true" />;
+      stateIcon = <CalendarClock className="media-detail-state-icon" size={20} aria-hidden="true" />;
       stateTitle = describeUpcomingRelease(movie);
       stateDetail = 'Il sera téléchargé sur le serveur dès sa sortie.';
     } else if (isJustAdded) {
-      stateIcon = <Search className="movie-detail-state-icon" size={20} aria-hidden="true" />;
+      stateIcon = <Search className="media-detail-state-icon" size={20} aria-hidden="true" />;
       stateTitle = 'Recherche en cours sur le serveur';
       stateDetail = 'Le film a été ajouté. Son téléchargement sur le serveur commencera dès qu’une version sera trouvée.';
     }
 
     return (
-      <div className="movie-detail-missing">
-        <div className="movie-detail-state">
+      <div className="media-detail-missing">
+        <div className="media-detail-state">
           {stateIcon}
-          <div className="movie-detail-state-text">
-            <p className="movie-detail-state-title">{stateTitle}</p>
-            <p className="movie-detail-state-detail">{stateDetail}</p>
+          <div className="media-detail-state-text">
+            <p className="media-detail-state-title">{stateTitle}</p>
+            <p className="media-detail-state-detail">{stateDetail}</p>
           </div>
         </div>
 
         {/* One row: main action, quality, then the destructive action at the end */}
-        <div className="movie-detail-actions">
+        <div className="media-detail-actions">
           {qualityProfiles.length > 0 && (
             <>
               <button
                 type="button"
-                className="movie-detail-search"
+                className="media-detail-search"
                 onClick={handleSearchWithQuality}
                 disabled={isSearchingQuality || !selectedQualityId}
                 aria-busy={isSearchingQuality}
@@ -228,7 +228,7 @@ export function MovieDetailView({
 
         {/* Always in the DOM so the result is announced when it appears */}
         <p
-          className={`movie-detail-status${qualitySearchOk === false ? ' movie-detail-status--error' : ''}`}
+          className={`media-detail-status${qualitySearchOk === false ? ' media-detail-status--error' : ''}`}
           role="status"
         >
           {qualityStatus}
@@ -267,7 +267,7 @@ export function MovieDetailView({
 
     return (
       <TransferStatus
-        id="movie-detail-download"
+        id="media-detail-download"
         title={title}
         details={details}
         progress={isStarting ? null : info.progress || 0}
@@ -296,13 +296,13 @@ export function MovieDetailView({
 
   const renderPlayable = () => (
     <>
-      <div className="movie-detail-actions">
-        <button type="button" className="movie-detail-play" onClick={handlePlayMovie}>
-          <Play className="movie-detail-play-icon" size={22} fill="currentColor" aria-hidden="true" />
+      <div className="media-detail-actions">
+        <button type="button" className="media-detail-play" onClick={handlePlayMovie}>
+          <Play className="media-detail-play-icon" size={22} fill="currentColor" aria-hidden="true" />
           Lancer le film
         </button>
         {!isLocalMovie && !isDownloading && !isPaused && !isFailed && (
-          <button type="button" className="movie-detail-quiet" onClick={() => onDownload(movie)}>
+          <button type="button" className="media-detail-quiet" onClick={() => onDownload(movie)}>
             <Download size={18} aria-hidden="true" />
             Télécharger
           </button>
@@ -320,7 +320,7 @@ export function MovieDetailView({
   };
 
   return (
-    <MovieDetailLayout
+    <MediaDetailLayout
       title={movie.title}
       fanartUrl={fanartUrl}
       posterUrl={posterUrl}
@@ -410,6 +410,6 @@ export function MovieDetailView({
         }}
         onClose={() => setShowCancelServerQueueConfirm(false)}
       />
-    </MovieDetailLayout>
+    </MediaDetailLayout>
   );
 }

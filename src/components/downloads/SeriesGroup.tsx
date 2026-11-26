@@ -12,9 +12,10 @@ interface SeriesGroupProps {
   /** `trigger`: the title button, which takes the focus back when the series page closes */
   readonly onSelectSeries?: (series: Series, trigger?: HTMLElement) => void;
   readonly episodes: readonly PresenceItem[];
-  /** Under the title: "3 épisodes", "1 en cours"… */
-  readonly details: readonly string[];
-  /** Progress of the whole series, null while waiting, undefined when nothing moves */
+  /** Under the title, short: "3 épisodes, reste 12 min" */
+  readonly summary: string;
+  /** Progress of the whole series, shown only while the group is folded (the episodes carry
+   *  their own bars when it is open); null while waiting, undefined when nothing moves */
   readonly progress?: number | null;
   readonly state?: TransferState;
   /** Open on first render (something in progress) */
@@ -22,17 +23,18 @@ interface SeriesGroupProps {
 }
 
 /**
- * Episodes of one series: the whole row opens the series page (title button stretched
- * over it, like a movie), the round chevron button alone shows or hides the episodes.
- * The list grows and folds through its height
- * (grid rows 0fr to 1fr) and is inert while closed.
+ * Several episodes of one series (a lone episode is a single row, see DownloadsView): the
+ * whole row opens the series page (title button stretched over it, like a movie), the round
+ * chevron button alone shows or hides the episodes. One bar per element: the series row has
+ * its own only while folded, open it gives way to the bars of its episodes. The list grows
+ * and folds through its height (grid rows 0fr to 1fr) and is inert while closed.
  */
 export function SeriesGroup({
   seriesTitle,
   seriesObj,
   onSelectSeries,
   episodes,
-  details,
+  summary,
   progress,
   state = 'active',
   defaultOpen,
@@ -57,7 +59,7 @@ export function SeriesGroup({
               type="button"
               className="dl-row-title dl-row-hit"
               id={titleId}
-              aria-describedby={details.length > 0 ? detailId : undefined}
+              aria-describedby={detailId}
               title="Voir la fiche de la série"
               data-series-id={seriesObj.id}
               onClick={event => onSelectSeries(seriesObj, event.currentTarget)}
@@ -69,15 +71,15 @@ export function SeriesGroup({
               <span className="dl-row-title-text">{seriesTitle}</span>
             </p>
           )}
-          {details.length > 0 && (
-            <p className="dl-row-detail" id={detailId}>
-              {details.map((detail, index) => (
-                <span key={index}>{detail}</span>
-              ))}
-            </p>
-          )}
+          <p className="dl-row-detail" id={detailId}>
+            <span>{summary}</span>
+          </p>
           {progress !== undefined && (
-            <TransferBar className="dl-row-bar" value={progress} state={state} labelledBy={titleId} />
+            <div className="dl-group-bar" inert={open}>
+              <div className="dl-group-bar-inner">
+                <TransferBar className="dl-row-bar" value={progress} state={state} labelledBy={titleId} />
+              </div>
+            </div>
           )}
         </div>
         <div className="dl-row-actions">

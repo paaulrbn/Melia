@@ -13,9 +13,11 @@
 @import './styles/layout.css';
 
 /* 4. Functional Domains */
+@import './styles/media.css';
 @import './styles/movies.css';
 @import './styles/modals.css';
 @import './styles/downloads.css';
+@import './styles/series.css';
 @import './styles/settings.css';
 @import './styles/status.css';
 @import './styles/update.css';

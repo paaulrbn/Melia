@@ -1,18 +1,28 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { MovieGroup, MovieGroupKey } from '../../utils/movieGroups';
 
-/** Where the dotted rail starts, from the top of the tree: just under the "Films" icon. */
+/** Where the dotted rail starts, from the top of the tree: just under the page's icon. */
 const RAIL_START = -4;
 
-interface MovieGroupTreeProps {
-  readonly groups: readonly MovieGroup[];
-  /** Group being read on the movies screen; null elsewhere. */
-  readonly activeKey: MovieGroupKey | null;
-  readonly onSelect: (key: MovieGroupKey) => void;
+/** One section of a library screen, as the sidebar lists it. */
+export interface LibraryGroupItem<K extends string = string> {
+  readonly key: K;
+  readonly title: string;
+  readonly count: number;
 }
 
-type Centers = ReadonlyMap<MovieGroupKey, number>;
+interface LibraryGroupTreeProps<K extends string> {
+  readonly groups: readonly LibraryGroupItem<K>[];
+  /** Group being read on its screen; null elsewhere. */
+  readonly activeKey: K | null;
+  readonly onSelect: (key: K) => void;
+  /** Name of the list for screen readers ("Groupes de films"). */
+  readonly label: string;
+  /** What the groups hold, for the name of each button ("film" / "films"). */
+  readonly noun: { readonly one: string; readonly many: string };
+}
+
+type Centers = ReadonlyMap<string, number>;
 
 function sameCenters(a: Centers, b: Centers): boolean {
   if (a.size !== b.size) return false;
@@ -68,23 +78,30 @@ function RailLayer({ tone, center }: Readonly<RailLayerProps>) {
 }
 
 /**
- * Library groups under "Films", hanging from a dotted rail. A white hook points at the
- * group on screen; a grey one follows the pointer and the keyboard focus. Positions are measured from the rows,
- * so they follow the number of groups, the font and the window size.
+ * Sections of a library screen (movies, series) listed under its sidebar entry, hanging
+ * from a dotted rail. A white hook points at the group on screen; a grey one follows the
+ * pointer and the keyboard focus. Positions are measured from the rows, so they follow the
+ * number of groups, the font and the window size.
  */
-export function MovieGroupTree({ groups, activeKey, onSelect }: Readonly<MovieGroupTreeProps>) {
+export function LibraryGroupTree<K extends string>({
+  groups,
+  activeKey,
+  onSelect,
+  label,
+  noun,
+}: Readonly<LibraryGroupTreeProps<K>>) {
   const treeRef = useRef<HTMLDivElement>(null);
-  const buttons = useRef(new Map<MovieGroupKey, HTMLButtonElement>());
+  const buttons = useRef(new Map<string, HTMLButtonElement>());
   const [centers, setCenters] = useState<Centers>(() => new Map());
   const centersRef = useRef<Centers>(centers);
-  const [hoveredKey, setHoveredKey] = useState<MovieGroupKey | null>(null);
+  const [hoveredKey, setHoveredKey] = useState<K | null>(null);
   /** Group reached with the keyboard: the grey hook follows it like the pointer. */
-  const [focusedKey, setFocusedKey] = useState<MovieGroupKey | null>(null);
+  const [focusedKey, setFocusedKey] = useState<K | null>(null);
   /** The layout itself moved (first render, font, resize, groups): place the hooks without sliding. */
   const [isJumping, setIsJumping] = useState(true);
 
   const measure = useCallback(() => {
-    const next = new Map<MovieGroupKey, number>();
+    const next = new Map<string, number>();
     buttons.current.forEach((button, key) => {
       next.set(key, button.offsetTop + button.offsetHeight / 2);
     });
@@ -140,11 +157,10 @@ export function MovieGroupTree({ groups, activeKey, onSelect }: Readonly<MovieGr
       </div>
       <ul
         className="sidebar-sublist"
-        aria-label="Groupes de films"
+        aria-label={label}
         onPointerLeave={() => setHoveredKey(null)}
       >
         {groups.map(group => {
-          const count = group.movies.length;
           const isCurrent = group.key === activeKey;
           return (
             <li key={group.key}>
@@ -156,7 +172,7 @@ export function MovieGroupTree({ groups, activeKey, onSelect }: Readonly<MovieGr
                 type="button"
                 className={`sidebar-sublink${isCurrent ? ' is-current' : ''}`}
                 aria-current={isCurrent ? 'true' : undefined}
-                aria-label={`${group.title}, ${count} ${count > 1 ? 'films' : 'film'}`}
+                aria-label={`${group.title}, ${group.count} ${group.count > 1 ? noun.many : noun.one}`}
                 onClick={() => onSelect(group.key)}
                 onPointerEnter={() => setHoveredKey(group.key)}
                 // Same rule as the CSS: only a visible (keyboard) focus counts, not a click
@@ -166,7 +182,7 @@ export function MovieGroupTree({ groups, activeKey, onSelect }: Readonly<MovieGr
                 onBlur={() => setFocusedKey(null)}
               >
                 <span className="sidebar-sublink-label">{group.title}</span>
-                <span className="sidebar-sublink-count">{count}</span>
+                <span className="sidebar-sublink-count">{group.count}</span>
               </button>
             </li>
           );

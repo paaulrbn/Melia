@@ -33,7 +33,7 @@ body {
    Episode summaries sit in clickable rows: they keep the row's behaviour. */
 :where(
   .overview,
-  .movie-detail-overview,
+  .media-detail-overview,
   textarea,
   input:not([type='checkbox'], [type='radio'], [type='button'], [type='submit'], [type='reset'], [type='range'])
 ) {

@@ -4,7 +4,7 @@ import { LookupMovie, QualityProfile } from '../../types';
 import { formatDuration } from '../../utils/formatters';
 import { getImageUrl } from '../../utils/media';
 import { Checkbox } from '../ui';
-import { MovieDetailLayout, QualityPicker } from './MovieDetailLayout';
+import { MediaDetailLayout, QualityPicker } from '../media/MediaDetailLayout';
 
 interface AddMovieViewProps {
   readonly movie: LookupMovie;
@@ -39,7 +39,7 @@ export function AddMovieView({
   else if (error) status = `Ajout impossible : ${error}`;
 
   return (
-    <MovieDetailLayout
+    <MediaDetailLayout
       title={movie.title}
       fanartUrl={getImageUrl(movie, 'fanart')}
       posterUrl={getImageUrl(movie, 'poster')}
@@ -50,20 +50,20 @@ export function AddMovieView({
         </>
       }
       primary={
-        <div className="movie-detail-add">
+        <div className="media-detail-add">
           {/* Main action first, quality next to it at the same height */}
-          <div className="movie-detail-actions movie-detail-actions--add">
+          <div className="media-detail-actions media-detail-actions--add">
             <button
               type="button"
-              className="movie-detail-play"
+              className="media-detail-play"
               onClick={() => onAdd(autoDownload)}
               disabled={isAdding || !selectedQuality}
               aria-busy={isAdding}
             >
               {isAdding ? (
-                <Loader2 className="movie-detail-play-icon animate-spin" size={22} aria-hidden="true" />
+                <Loader2 className="media-detail-play-icon animate-spin" size={22} aria-hidden="true" />
               ) : (
-                <Plus className="movie-detail-play-icon" size={22} aria-hidden="true" />
+                <Plus className="media-detail-play-icon" size={22} aria-hidden="true" />
               )}
               Ajouter
             </button>
@@ -82,12 +82,12 @@ export function AddMovieView({
             onChange={e => setAutoDownload(e.target.checked)}
             disabled={isAdding}
             label="Télécharger sur cet ordinateur dès qu’il est disponible sur le serveur"
-            containerClassName="movie-detail-option"
+            containerClassName="media-detail-option"
           />
 
           {/* Always in the DOM so progress and errors are announced when they appear */}
           <p
-            className={`movie-detail-status${!isAdding && error ? ' movie-detail-status--error' : ''}`}
+            className={`media-detail-status${!isAdding && error ? ' media-detail-status--error' : ''}`}
             role="status"
           >
             {status}

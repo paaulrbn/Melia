@@ -9,11 +9,12 @@ export const PAGE_TITLES: Record<TabType, string> = {
 };
 
 /**
- * Pages a movie page can open over, with the accessible name of its back button. The
- * movie page remembers the one it was opened from and goes back to it.
+ * Pages a detail page (movie or series) can open over, with the accessible name of its
+ * back button. The detail page remembers the one it was opened from and goes back to it.
  */
 export const DETAIL_BACK_LABELS: Partial<Record<TabType, string>> = {
   movies: 'Retour aux films',
+  series: 'Retour aux séries',
   downloads: 'Retour aux téléchargements',
 };
 

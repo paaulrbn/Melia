@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { DownloadInfo, LookupSeries, Series, UnifiedQueueItem } from '../../types';
 import { Settings } from 'lucide-react';
+import { seriesGroupHeadingId, seriesGroupSectionId, type SeriesLibraryGroup } from '../../utils/seriesGroups';
 import { Button } from '../ui';
 import { SeriesCard } from './SeriesCard';
 
@@ -11,14 +12,15 @@ interface SeriesViewProps {
   readonly searchResults: LookupSeries[];
   readonly isSearching: boolean;
   readonly series: Series[];
-  readonly localSeries: Series[];
-  readonly serverSeries: Series[];
-  readonly unavailableSeries: Series[];
+  /** Sections of the library (mine, on the server, waiting), also listed in the sidebar */
+  readonly seriesGroups: readonly SeriesLibraryGroup[];
   readonly downloads: Record<string, DownloadInfo>;
   readonly sonarrQueue: UnifiedQueueItem[];
   readonly findInLibrary: (tvdbId: number) => Series | undefined;
-  readonly onSelectSeries: (series: Series) => void;
-  readonly onOpenAddSeries: (lookupSeries: LookupSeries) => void;
+  /** Opens the detail page; `trigger` takes the focus back when it closes. */
+  readonly onSelectSeries: (series: Series, trigger: HTMLElement) => void;
+  /** Opens the page that adds a search result; `trigger` takes the focus back when it closes. */
+  readonly onOpenAddSeries: (lookupSeries: LookupSeries, trigger: HTMLElement) => void;
   readonly isConfigLoaded: boolean;
   readonly isConfigured: boolean;
   readonly hasLoaded: boolean;
@@ -31,9 +33,7 @@ export function SeriesView({
   searchResults,
   isSearching,
   series,
-  localSeries,
-  serverSeries,
-  unavailableSeries,
+  seriesGroups,
   downloads,
   sonarrQueue,
   findInLibrary,
@@ -95,11 +95,11 @@ export function SeriesView({
               key={lookup.tvdbId}
               series={lookup}
               isAddHint={!librarySeries}
-              onClick={() => {
+              onClick={event => {
                 if (librarySeries) {
-                  onSelectSeries(librarySeries);
+                  onSelectSeries(librarySeries, event.currentTarget);
                 } else {
-                  onOpenAddSeries(lookup);
+                  onOpenAddSeries(lookup, event.currentTarget);
                 }
               }}
             />
@@ -140,55 +140,35 @@ export function SeriesView({
     }
     return (
       <div className="movie-categories">
-        {localSeries.length > 0 && (
-          <div className="movie-category">
-            <h3 className="category-title">Mes séries</h3>
+        {seriesGroups.map(group => (
+          <section
+            key={group.key}
+            id={seriesGroupSectionId(group.key)}
+            className="movie-category"
+            aria-labelledby={seriesGroupHeadingId(group.key)}
+          >
+            <h3
+              className="category-title"
+              id={seriesGroupHeadingId(group.key)}
+              tabIndex={-1}
+              aria-label={`${group.title}, ${group.series.length} ${group.series.length > 1 ? 'séries' : 'série'}`}
+            >
+              <span>{group.title}</span>
+              <span className="category-count">{group.series.length}</span>
+            </h3>
             <div className="movie-grid">
-              {localSeries.map(s => (
+              {group.series.map(s => (
                 <SeriesCard
                   key={s.id}
                   series={s}
                   localEpisodeCount={localEpisodeCountBySeries.get(s.id) || 0}
                   queueItems={queueBySeriesId.get(s.id)}
-                  onClick={() => onSelectSeries(s)}
+                  onClick={event => onSelectSeries(s, event.currentTarget)}
                 />
               ))}
             </div>
-          </div>
-        )}
-
-        {serverSeries.length > 0 && (
-          <div className="movie-category">
-            <h3 className="category-title">Sur le serveur</h3>
-            <div className="movie-grid">
-              {serverSeries.map(s => (
-                <SeriesCard
-                  key={s.id}
-                  series={s}
-                  localEpisodeCount={localEpisodeCountBySeries.get(s.id) || 0}
-                  queueItems={queueBySeriesId.get(s.id)}
-                  onClick={() => onSelectSeries(s)}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {unavailableSeries.length > 0 && (
-          <div className="movie-category">
-            <h3 className="category-title">En attente</h3>
-            <div className="movie-grid">
-              {unavailableSeries.map(s => (
-                <SeriesCard
-                  key={s.id}
-                  series={s}
-                  queueItems={queueBySeriesId.get(s.id)}
-                  onClick={() => onSelectSeries(s)}
-                />
-              ))}
-            </div>
-          </div>
-        )}
+          </section>
+        ))}
       </div>
     );
   };

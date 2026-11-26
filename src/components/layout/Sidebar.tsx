@@ -1,8 +1,9 @@
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { Download, Film, Settings, Tv } from 'lucide-react';
 import { TabType } from '../../types';
 import { MovieGroup, MovieGroupKey } from '../../utils/movieGroups';
-import { MovieGroupTree } from './MovieGroupTree';
+import { SeriesGroupKey, SeriesLibraryGroup } from '../../utils/seriesGroups';
+import { LibraryGroupTree } from './LibraryGroupTree';
 
 /** macOS sidebar icon size (medium rows), matches --sidebar-icon-size. */
 const ICON_SIZE = 16;
@@ -19,6 +20,11 @@ interface SidebarProps {
   /** Group being read on the movies screen; null elsewhere. */
   readonly activeMovieGroup: MovieGroupKey | null;
   readonly onSelectMovieGroup: (key: MovieGroupKey) => void;
+  /** Library groups listed under "Séries", on every screen. */
+  readonly seriesGroups: readonly SeriesLibraryGroup[];
+  /** Group being read on the series screen; null elsewhere. */
+  readonly activeSeriesGroup: SeriesGroupKey | null;
+  readonly onSelectSeriesGroup: (key: SeriesGroupKey) => void;
 }
 
 interface NavItemProps {
@@ -55,8 +61,19 @@ export function Sidebar({
   movieGroups,
   activeMovieGroup,
   onSelectMovieGroup,
+  seriesGroups,
+  activeSeriesGroup,
+  onSelectSeriesGroup,
 }: Readonly<SidebarProps>) {
   const hasActiveDownloads = activeDownloadCount > 0;
+  const movieItems = useMemo(
+    () => movieGroups.map(group => ({ key: group.key, title: group.title, count: group.movies.length })),
+    [movieGroups]
+  );
+  const seriesItems = useMemo(
+    () => seriesGroups.map(group => ({ key: group.key, title: group.title, count: group.series.length })),
+    [seriesGroups]
+  );
 
   return (
     <aside id={id} className={`sidebar${isCollapsed ? ' is-collapsed' : ''}`}>
@@ -72,11 +89,13 @@ export function Sidebar({
               isActive={activeTab === 'movies'}
               onClick={() => onSelectTab('movies')}
             />
-            {movieGroups.length > 0 && (
-              <MovieGroupTree
-                groups={movieGroups}
+            {movieItems.length > 0 && (
+              <LibraryGroupTree
+                groups={movieItems}
                 activeKey={activeMovieGroup}
                 onSelect={onSelectMovieGroup}
+                label="Groupes de films"
+                noun={{ one: 'film', many: 'films' }}
               />
             )}
           </li>
@@ -87,6 +106,15 @@ export function Sidebar({
               isActive={activeTab === 'series'}
               onClick={() => onSelectTab('series')}
             />
+            {seriesItems.length > 0 && (
+              <LibraryGroupTree
+                groups={seriesItems}
+                activeKey={activeSeriesGroup}
+                onSelect={onSelectSeriesGroup}
+                label="Groupes de séries"
+                noun={{ one: 'série', many: 'séries' }}
+              />
+            )}
           </li>
           <li>
             <NavItem

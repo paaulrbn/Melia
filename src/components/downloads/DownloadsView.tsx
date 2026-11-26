@@ -1,14 +1,20 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, type ReactNode } from 'react';
 import { Pause, Play, Trash2, X } from 'lucide-react';
 import { DownloadInfo, Movie, Series, UnifiedQueueItem } from '../../types';
 import { getImageUrl } from '../../utils/media';
+import { parseLocalTimeLeft, parseQueueTimeLeft } from '../../utils/transfer';
 import { Button, type TransferState } from '../ui';
 import { ConfirmModal } from '../common/ConfirmModal';
 import { DownloadItem } from './DownloadItem';
 import { DownloadAction, DownloadRow, DownloadThumb } from './DownloadRow';
 import { PresenceList, type PresenceItem } from './PresenceList';
 import { SeriesGroup } from './SeriesGroup';
-import { describeLocalDownload, describeServerItem } from './transferDetails';
+import {
+  describeGroupSummary,
+  describeLocalDownload,
+  describeServerItem,
+  formatEpisodeLabel,
+} from './transferDetails';
 
 export interface DownloadsViewProps {
   readonly downloads: Record<string, DownloadInfo>;
@@ -39,18 +45,21 @@ function getEpisodeDisplayTitle(subTitle?: string, fallbackNumber?: number): str
   return cleaned;
 }
 
-/** Title of an episode row and the grey line that places it in the series. */
+/**
+ * What names an episode: its title, its tag ("S01E02") and the compact label that joins
+ * them ("S01E02 Titre"), which is all a row needs: no separate "Saison 1, épisode 2".
+ */
 function describeEpisode(item: { subTitle?: string; seasonNumber?: number; episodeNumber?: number }) {
-  const sNum = item.seasonNumber ?? 1;
   const eNum = item.episodeNumber ?? 1;
   const title = getEpisodeDisplayTitle(item.subTitle, item.episodeNumber) || `Épisode ${eNum}`;
   const hasSpecificTitle = title.toLowerCase() !== `épisode ${eNum}`.toLowerCase();
-  const place = hasSpecificTitle ? `Saison ${sNum}, épisode ${eNum}` : `Saison ${sNum}`;
-  return { title, place };
+  const tag = getEpisodeTag(item.seasonNumber, item.episodeNumber);
+  return { title, tag, label: formatEpisodeLabel(tag, title, hasSpecificTitle) };
 }
 
-function countEpisodes(count: number): string {
-  return `${count} épisode${count > 1 ? 's' : ''}`;
+/** Longest time left among the episodes still moving: when the whole series is done. */
+function longestTimeLeft(seconds: number[]): number {
+  return seconds.reduce((longest, value) => Math.max(longest, value), 0);
 }
 
 interface HasSeasonAndEpisode {
@@ -122,10 +131,18 @@ function SectionHeading({ id, title, count }: Readonly<SectionHeadingProps>) {
   );
 }
 
+/** A series of the downloads page: its episodes, and the series page they belong to. */
+interface EpisodeGroup<T> {
+  readonly key: string;
+  readonly seriesTitle: string;
+  readonly seriesObj?: Series;
+  readonly episodes: T[];
+}
+
 /**
  * Downloads page: what is on this computer (to play, or still coming), then what the
- * server is still fetching. One grouped list per section, a row per movie, a disclosure
- * row per series with its episodes under it.
+ * server is still fetching. One grouped list per section, a row per movie, a row per
+ * series with a single episode, a disclosure row per series with several.
  */
 export function DownloadsView(props: Readonly<DownloadsViewProps>) {
   const {
@@ -147,6 +164,8 @@ export function DownloadsView(props: Readonly<DownloadsViewProps>) {
     subTitle?: string;
     isCompleted: boolean;
   } | null>(null);
+  // Download on the server to cancel, once confirmed (as on the movie and series pages)
+  const [serverCancelTarget, setServerCancelTarget] = useState<UnifiedQueueItem | null>(null);
 
   const localDownloadList = useMemo(() => {
     return Object.values(downloads).sort((a, b) => {
@@ -256,44 +275,49 @@ export function DownloadsView(props: Readonly<DownloadsViewProps>) {
 
   const isEmpty = localDownloadList.length === 0 && serverQueueList.length === 0;
 
-  const renderLocalEpisode = (dl: DownloadInfo, seriesTitle: string): PresenceItem => {
-    const isCompleted = dl.status === 'completed';
-    const isDownloading = dl.status === 'downloading';
-    const canResume = dl.status === 'paused' || dl.status === 'error';
-    const { title, place } = describeEpisode(dl);
-    const view = describeLocalDownload(dl);
-    const epTag = getEpisodeTag(dl.seasonNumber, dl.episodeNumber);
+  const canOpenSeries = (group: EpisodeGroup<unknown>) =>
+    group.seriesObj !== undefined && onSelectSeries !== undefined;
 
-    const actions = isCompleted ? (
+  /** Buttons of a local episode: play and delete when it is on disk, else pause/resume and cancel. */
+  const renderLocalEpisodeActions = (
+    dl: DownloadInfo,
+    seriesTitle: string,
+    title: string,
+    tag: string
+  ): ReactNode => {
+    if (dl.status === 'completed') {
+      return (
+        <>
+          {dl.path && (
+            <Button
+              variant="primary"
+              size="sm"
+              leftIcon={<Play size={14} fill="currentColor" aria-hidden="true" />}
+              onClick={() => onPlay(dl.path!, `${seriesTitle} ${tag}`)}
+              aria-label={`Lancer ${title}`}
+            >
+              Lancer
+            </Button>
+          )}
+          <DownloadAction
+            label="Supprimer de cet ordinateur"
+            icon={<Trash2 size={16} aria-hidden="true" />}
+            onClick={() => setDeleteConfirmTarget({ id: dl.id, title: seriesTitle, subTitle: title, isCompleted: true })}
+            destructive
+          />
+        </>
+      );
+    }
+    return (
       <>
-        {dl.path && (
-          <Button
-            variant="primary"
-            size="sm"
-            leftIcon={<Play size={14} fill="currentColor" aria-hidden="true" />}
-            onClick={() => onPlay(dl.path!, `${seriesTitle} ${epTag}`)}
-            aria-label={`Lancer ${title}`}
-          >
-            Lancer
-          </Button>
-        )}
-        <DownloadAction
-          label="Supprimer de cet ordinateur"
-          icon={<Trash2 size={16} aria-hidden="true" />}
-          onClick={() => setDeleteConfirmTarget({ id: dl.id, title: seriesTitle, subTitle: title, isCompleted: true })}
-          destructive
-        />
-      </>
-    ) : (
-      <>
-        {isDownloading && (
+        {dl.status === 'downloading' && (
           <DownloadAction
             label="Mettre en pause"
             icon={<Pause size={16} aria-hidden="true" />}
             onClick={() => onPause(dl.id)}
           />
         )}
-        {canResume && (
+        {(dl.status === 'paused' || dl.status === 'error') && (
           <DownloadAction
             label="Reprendre le téléchargement"
             icon={<Play size={16} aria-hidden="true" />}
@@ -303,56 +327,89 @@ export function DownloadsView(props: Readonly<DownloadsViewProps>) {
         <DownloadAction
           label="Annuler le téléchargement"
           icon={<X size={16} aria-hidden="true" />}
-          onClick={() => onDelete(dl.id, false)}
+          onClick={() => setDeleteConfirmTarget({ id: dl.id, title: seriesTitle, subTitle: title, isCompleted: false })}
           destructive
         />
       </>
     );
+  };
 
+  const renderServerEpisodeActions = (ep: UnifiedQueueItem): ReactNode =>
+    onCancelServerQueue && (
+      <DownloadAction
+        label="Annuler le téléchargement sur le serveur"
+        icon={<X size={16} aria-hidden="true" />}
+        onClick={() => setServerCancelTarget(ep)}
+        destructive
+      />
+    );
+
+  /** Compact line of an episode inside a group: "S01E02 Titre", figures, bar, actions. */
+  const renderLocalEpisode = (dl: DownloadInfo, seriesTitle: string): PresenceItem => {
+    const { title, tag, label } = describeEpisode(dl);
+    const view = describeLocalDownload(dl);
     return {
       key: dl.id,
       node: (
         <DownloadRow
           variant="episode"
-          title={title}
-          prefix={place}
+          title={label}
           status={view.status}
           details={view.figures}
           progress={view.progress}
           state={view.state}
-          actions={actions}
+          actions={renderLocalEpisodeActions(dl, seriesTitle, title, tag)}
         />
       ),
     };
   };
 
   const renderServerEpisode = (ep: UnifiedQueueItem): PresenceItem => {
-    const { title, place } = describeEpisode(ep);
+    const { label } = describeEpisode(ep);
     const view = describeServerItem(ep);
     return {
       key: ep.id,
       node: (
         <DownloadRow
           variant="episode"
-          title={title}
-          prefix={place}
+          title={label}
           status={view.status}
           details={view.figures}
           progress={view.progress}
           state={view.state}
-          actions={
-            onCancelServerQueue && (
-              <DownloadAction
-                label="Annuler le téléchargement sur le serveur"
-                icon={<X size={16} aria-hidden="true" />}
-                onClick={() => onCancelServerQueue(ep)}
-                destructive
-              />
-            )
-          }
+          actions={renderServerEpisodeActions(ep)}
         />
       ),
     };
+  };
+
+  /** Series with a single episode: one row, nothing to unfold; the row opens the series page. */
+  const renderSingleEpisodeRow = (
+    group: EpisodeGroup<unknown>,
+    episode: { label: string },
+    view: ReturnType<typeof describeServerItem>,
+    actions: ReactNode
+  ): ReactNode => {
+    const { seriesObj } = group;
+    return (
+      <DownloadRow
+        title={group.seriesTitle}
+        subtitle={episode.label}
+        status={view.status}
+        details={view.figures}
+        progress={view.progress}
+        state={view.state}
+        leading={<DownloadThumb src={seriesObj ? getImageUrl(seriesObj, 'poster') : null} kind="series" />}
+        onOpen={
+          canOpenSeries(group) && seriesObj && onSelectSeries
+            ? trigger => onSelectSeries(seriesObj, trigger)
+            : undefined
+        }
+        openLabel="Voir la fiche de la série"
+        seriesId={seriesObj?.id}
+        actions={actions}
+      />
+    );
   };
 
   const localItems: PresenceItem[] = [
@@ -371,19 +428,34 @@ export function DownloadsView(props: Readonly<DownloadsViewProps>) {
       ),
     })),
     ...localSeriesGroups.map(group => {
+      const key = `local-${group.key}`;
+      if (group.episodes.length === 1) {
+        const dl = group.episodes[0];
+        const { title, tag, label } = describeEpisode(dl);
+        return {
+          key,
+          node: renderSingleEpisodeRow(
+            group,
+            { label },
+            describeLocalDownload(dl),
+            renderLocalEpisodeActions(dl, group.seriesTitle, title, tag)
+          ),
+        };
+      }
+
       const { progress, state, active } = localGroupProgress(group.episodes);
-      const count = group.episodes.length;
-      const details = [countEpisodes(count)];
-      if (active > 0 && active < count) details.push(`${active} en cours`);
+      const timeLeft = longestTimeLeft(
+        group.episodes.filter(dl => dl.status === 'downloading').map(dl => parseLocalTimeLeft(dl.timeRemaining))
+      );
       return {
-        key: `local-${group.key}`,
+        key,
         node: (
           <SeriesGroup
             seriesTitle={group.seriesTitle}
             seriesObj={group.seriesObj}
             onSelectSeries={onSelectSeries}
             episodes={group.episodes.map(dl => renderLocalEpisode(dl, group.seriesTitle))}
-            details={details}
+            summary={describeGroupSummary(group.episodes.length, timeLeft)}
             progress={progress}
             state={state}
             defaultOpen={active > 0}
@@ -410,34 +482,42 @@ export function DownloadsView(props: Readonly<DownloadsViewProps>) {
             onOpen={movie && onSelectMovie ? trigger => onSelectMovie(movie, trigger) : undefined}
             openLabel="Voir la fiche du film"
             movieId={movie && onSelectMovie ? movie.id : undefined}
-            actions={
-              onCancelServerQueue && (
-                <DownloadAction
-                  label="Annuler le téléchargement sur le serveur"
-                  icon={<X size={16} aria-hidden="true" />}
-                  onClick={() => onCancelServerQueue(queueItem)}
-                  destructive
-                />
-              )
-            }
+            actions={renderServerEpisodeActions(queueItem)}
           />
         ),
       };
     }),
-    ...serverSeriesGroups.map(group => ({
-      key: `server-${group.key}`,
-      node: (
-        <SeriesGroup
-          seriesTitle={group.seriesTitle}
-          seriesObj={group.seriesObj}
-          onSelectSeries={onSelectSeries}
-          episodes={group.episodes.map(renderServerEpisode)}
-          details={[countEpisodes(group.episodes.length)]}
-          progress={serverGroupProgress(group.episodes)}
-          defaultOpen
-        />
-      ),
-    })),
+    ...serverSeriesGroups.map(group => {
+      const key = `server-${group.key}`;
+      if (group.episodes.length === 1) {
+        const ep = group.episodes[0];
+        return {
+          key,
+          node: renderSingleEpisodeRow(
+            group,
+            describeEpisode(ep),
+            describeServerItem(ep),
+            renderServerEpisodeActions(ep)
+          ),
+        };
+      }
+
+      const timeLeft = longestTimeLeft(group.episodes.map(ep => parseQueueTimeLeft(ep.timeleft)));
+      return {
+        key,
+        node: (
+          <SeriesGroup
+            seriesTitle={group.seriesTitle}
+            seriesObj={group.seriesObj}
+            onSelectSeries={onSelectSeries}
+            episodes={group.episodes.map(renderServerEpisode)}
+            summary={describeGroupSummary(group.episodes.length, timeLeft)}
+            progress={serverGroupProgress(group.episodes)}
+            defaultOpen
+          />
+        ),
+      };
+    }),
   ];
 
   return (
@@ -470,23 +550,25 @@ export function DownloadsView(props: Readonly<DownloadsViewProps>) {
         </>
       )}
 
-      {/* Delete Confirmation Modal for completed local series episodes */}
+      {/* Episodes on this computer: delete a finished one, or cancel one in progress
+          (the partial file goes too, as for movies) */}
       <ConfirmModal
         isOpen={!!deleteConfirmTarget}
-        title="Supprimer le téléchargement"
+        title={deleteConfirmTarget?.isCompleted === false ? 'Annuler le téléchargement' : 'Supprimer le téléchargement'}
         message={
           deleteConfirmTarget ? (
             <>
-              Voulez-vous vraiment supprimer{' '}
+              {deleteConfirmTarget.isCompleted ? 'Voulez-vous vraiment supprimer' : 'Voulez-vous vraiment annuler le téléchargement de'}{' '}
               <strong>
                 {deleteConfirmTarget.title}
                 {deleteConfirmTarget.subTitle ? ` (${deleteConfirmTarget.subTitle})` : ''}
-              </strong>{' '}
-              de votre disque local&nbsp;?
+              </strong>
+              {deleteConfirmTarget.isCompleted ? ' de votre disque local' : ''}&nbsp;?
             </>
           ) : ''
         }
-        confirmLabel="Supprimer"
+        confirmLabel={deleteConfirmTarget?.isCompleted === false ? 'Annuler le téléchargement' : 'Supprimer'}
+        cancelLabel={deleteConfirmTarget?.isCompleted === false ? 'Conserver' : undefined}
         variant="danger"
         onConfirm={() => {
           if (deleteConfirmTarget) {
@@ -495,6 +577,31 @@ export function DownloadsView(props: Readonly<DownloadsViewProps>) {
           }
         }}
         onClose={() => setDeleteConfirmTarget(null)}
+      />
+
+      <ConfirmModal
+        isOpen={!!serverCancelTarget}
+        title="Annuler le téléchargement sur le serveur"
+        message={
+          serverCancelTarget ? (
+            <>
+              Voulez-vous vraiment annuler le téléchargement de{' '}
+              <strong>
+                {serverCancelTarget.title}
+                {serverCancelTarget.subTitle ? ` (${serverCancelTarget.subTitle})` : ''}
+              </strong>{' '}
+              sur le serveur&nbsp;?
+            </>
+          ) : ''
+        }
+        confirmLabel="Annuler le téléchargement"
+        cancelLabel="Conserver"
+        variant="danger"
+        onConfirm={() => {
+          if (serverCancelTarget) onCancelServerQueue?.(serverCancelTarget);
+          setServerCancelTarget(null);
+        }}
+        onClose={() => setServerCancelTarget(null)}
       />
     </div>
   );

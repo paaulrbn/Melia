@@ -1,0 +1,201 @@
+/* ==========================================================================
+   Series page: seasons and episodes
+   Under the summary, over the whole width of the page content. The episodes are rows of
+   the downloads page (.dl-row, geometry variables in downloads.css under .episodes-panel):
+   the number takes the place of the poster, so the titles start on the same edge.
+   ========================================================================== */
+.episodes-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+/* Seasons on the leading side, the season download on the trailing side; the button goes
+   under the tabs when the two do not fit */
+.episodes-bar {
+  --detail-control-height: 36px;
+
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm) var(--space-md);
+}
+
+/* --------------------------------------------------------------------------
+   Season tabs: segmented control, the pill slides to the chosen season
+   (transitions.dev tabs sliding). A long list scrolls sideways.
+   -------------------------------------------------------------------------- */
+.season-tabs {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  border-radius: var(--radius-pill);
+}
+
+.season-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.season-tabs-track {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-pill);
+  background-color: var(--surface-1);
+}
+
+.season-tab {
+  position: relative;
+  z-index: 1;
+  height: 30px;
+  padding-inline: var(--space-sm);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-body), sans-serif;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--duration-quick) var(--ease-out);
+}
+
+.season-tab:hover,
+.season-tab[aria-selected='true'] {
+  color: var(--text-primary);
+}
+
+.season-tab:hover {
+  transition-duration: var(--duration-micro);
+}
+
+/* The ring goes inside the tab: the scroll area would cut it outside */
+.season-tab:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -3px;
+}
+
+/* Position and width are written by SeasonTabs; this is the tween between two seasons */
+.season-tabs-pill {
+  position: absolute;
+  top: 3px;
+  left: 0;
+  z-index: 0;
+  width: 0;
+  height: 30px;
+  border-radius: var(--radius-pill);
+  background-color: var(--surface-3);
+  box-shadow: inset 0 0 0 0.5px var(--glass-edge), var(--glass-highlight);
+  transform: translateX(0);
+  transition:
+    transform var(--tabs-dur) var(--tabs-ease),
+    width var(--tabs-dur) var(--tabs-ease);
+  will-change: transform, width;
+  pointer-events: none;
+}
+
+.episodes-season-download {
+  flex: none;
+}
+
+.episodes-season-download:disabled {
+  cursor: default;
+}
+
+/* --------------------------------------------------------------------------
+   Episode list
+   -------------------------------------------------------------------------- */
+/* Another season: the list comes back with a short fade, not a jump */
+.episodes-list {
+  animation: ui-fade-in var(--duration-quick) var(--ease-in-out) both;
+}
+
+.episodes-empty {
+  margin: 0;
+  padding: var(--space-lg) 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+/* Number in the poster column. A playable row shows a play icon in its place under the
+   pointer or the keyboard focus (transitions.dev icon swap: scale, opacity and blur). */
+.episode-index {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--dl-thumb-width);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Absent from the server: the number steps back with the title */
+.dl-row.is-dimmed .episode-index {
+  color: var(--text-tertiary);
+  opacity: 0.7;
+}
+
+.episode-index-number,
+.episode-index-play {
+  grid-area: 1 / 1;
+  transition:
+    opacity var(--icon-swap-dur) var(--icon-swap-ease),
+    scale var(--icon-swap-dur) var(--icon-swap-ease),
+    filter var(--icon-swap-dur) var(--icon-swap-ease);
+}
+
+.episode-index-play {
+  color: var(--icon-primary);
+  opacity: 0;
+  scale: var(--icon-swap-start-scale);
+  filter: blur(var(--icon-swap-blur));
+}
+
+.dl-row.is-clickable:is(:hover:not(:has(.dl-row-actions > :hover)), :has(> .dl-row-text > .dl-row-hit:focus-visible))
+  .episode-index-number {
+  opacity: 0;
+  scale: var(--icon-swap-start-scale);
+  filter: blur(var(--icon-swap-blur));
+}
+
+.dl-row.is-clickable:is(:hover:not(:has(.dl-row-actions > :hover)), :has(> .dl-row-text > .dl-row-hit:focus-visible))
+  .episode-index-play {
+  opacity: 1;
+  scale: 1;
+  filter: blur(0);
+}
+
+/* "Téléchargement lancé" in the place of the actions, for a few seconds */
+.episode-launched {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding-inline: var(--space-xs);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .season-tabs-pill,
+  .season-tab,
+  .episode-index-number,
+  .episode-index-play {
+    transition: none;
+  }
+
+  .episodes-list {
+    animation: none;
+  }
+}

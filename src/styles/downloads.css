@@ -6,7 +6,9 @@
    one moving element, red is kept for an interruption and destructive hovers.
    ========================================================================== */
 
-.downloads-view {
+/* Rows are also used by the episode list of the series page (.episodes-panel) */
+.downloads-view,
+.episodes-panel {
   /* Row geometry: the separators and the episodes start where the titles start */
   --dl-list-pad: 4px;
   --dl-row-pad-block: 10px;
@@ -20,7 +22,9 @@
   --dl-row-enter: 250ms;
   --dl-row-exit: var(--duration-quick); /* 150ms. Same as EXIT_MS in PresenceList.tsx */
   --dl-acc-dur: 250ms;
+}
 
+.downloads-view {
   display: flex;
   flex-direction: column;
   gap: var(--space-xl);
@@ -244,6 +248,21 @@
   outline-offset: -3px;
 }
 
+/* Summary of an episode: grey, two lines at most */
+.dl-row-description {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  max-width: 65ch;
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
 /* Figures spaced apart, no separator; tabular digits so they do not jiggle each second */
 .dl-row-detail {
   display: flex;
@@ -258,6 +277,35 @@
 
 .dl-row-detail > span {
   white-space: nowrap;
+}
+
+/* Small icon before the state word ("Sur cet ordinateur") */
+.dl-row-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.dl-row-status-icon {
+  flex: none;
+  color: var(--icon-tertiary);
+}
+
+/* Line under a title ("S01E01 Celebration"): lighter than the title, darker than the figures */
+.dl-row-subtitle {
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Something that is not there yet (an episode missing from the server): the title steps
+   back, the grey mention says why */
+.dl-row.is-dimmed .dl-row-title {
+  color: var(--text-tertiary);
 }
 
 .dl-row[data-state='error'] .dl-row-status {
@@ -313,8 +361,19 @@
   color: var(--danger);
 }
 
-.dl-action:active {
+.dl-action:active:not(:disabled) {
   scale: 0.96;
+}
+
+/* Running: dimmed, no hover feedback; the caller shows a spinner as its icon */
+.dl-action:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.dl-action:disabled:hover {
+  background-color: var(--glass-fill);
+  color: var(--icon-secondary);
 }
 
 .dl-action:focus-visible {
@@ -342,6 +401,26 @@
 
 .dl-group[data-open='true'] .dl-group-chevron {
   transform: scaleY(-1);
+}
+
+/* The series' own bar folds away while its episodes are shown (they carry their own) */
+.dl-group-bar {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows var(--dl-acc-dur) var(--ease-smooth-out),
+    opacity var(--duration-quick) var(--ease-out);
+}
+
+.dl-group[data-open='true'] .dl-group-bar {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+
+.dl-group-bar-inner {
+  min-height: 0;
+  overflow: hidden;
 }
 
 .dl-group-panel {
@@ -402,6 +481,7 @@
   }
 
   .dl-slot[data-presence='leaving'],
+  .dl-group-bar,
   .dl-group-panel,
   .dl-group-panel-inner,
   .dl-group-chevron {

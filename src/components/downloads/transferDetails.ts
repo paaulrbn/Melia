@@ -19,6 +19,18 @@ function localSizes(download: DownloadInfo): string {
   return raw.replace(' / ', ' sur ');
 }
 
+/** "S01E02 Titre", or the bare tag when the episode has no title of its own. */
+export function formatEpisodeLabel(tag: string, title: string, hasSpecificTitle: boolean): string {
+  return hasSpecificTitle && title ? `${tag} ${title}` : tag;
+}
+
+/** Short line of a series group: "3 épisodes, reste 12 min" (no time when none is known). */
+export function describeGroupSummary(count: number, secondsLeft: number): string {
+  const episodes = `${count} épisode${count > 1 ? 's' : ''}`;
+  const left = formatTimeLeft(secondsLeft);
+  return left ? `${episodes}, ${left}` : episodes;
+}
+
 export function describeLocalDownload(download: DownloadInfo): TransferView {
   const sizes = localSizes(download);
 
