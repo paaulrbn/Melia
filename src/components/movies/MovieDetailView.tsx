@@ -1,25 +1,25 @@
 import { useState, type ReactNode } from 'react';
 import {
   CalendarClock,
-  CloudDownload,
   Download,
   Loader2,
   Pause,
   Play,
   RotateCw,
+  Search,
   SearchX,
   Trash2,
   X,
 } from 'lucide-react';
 import { Config, DownloadInfo, Movie, QualityProfile, QueueRecord } from '../../types';
+import { useMovieDirectors } from '../../hooks/useMovieDirectors';
+import { formatNameList } from '../../utils/credits';
 import { formatDuration, formatSize } from '../../utils/formatters';
 import { getImageUrl, getStreamUrl } from '../../utils/media';
 import { describeUpcomingRelease, isMovieUpcoming } from '../../utils/release';
+import { formatTimeLeft, parseLocalTimeLeft, parseQueueTimeLeft } from '../../utils/transfer';
 import { ConfirmModal } from '../common/ConfirmModal';
-import { IconButton, ProgressBar, Select } from '../ui';
-
-/** Heading of the detail page: it takes the focus when the page opens. */
-export const MOVIE_DETAIL_HEADING_ID = 'movie-detail-title';
+import { MovieDetailLayout, QualityPicker, TransferStatus } from './MovieDetailLayout';
 
 interface MovieDetailViewProps {
   readonly movie: Movie;
@@ -39,6 +39,8 @@ interface MovieDetailViewProps {
   readonly onCancelServerQueue: (queueId: number) => void;
   readonly qualityProfiles: QualityProfile[];
   readonly onChangeQuality: (movieId: number, qualityProfileId: number) => Promise<boolean>;
+  /** Added from the search a moment ago: the server is still looking for a release. */
+  readonly isJustAdded?: boolean;
 }
 
 function localFilename(movie: Movie): string {
@@ -47,10 +49,10 @@ function localFilename(movie: Movie): string {
 }
 
 /**
- * Movie page, shown in the content area in place of the list. The backdrop header holds
- * everything needed at a glance: poster, title, key facts and the main action (play, or
- * what stands in for it: server progress, release date, quality and new search). The
- * summary follows below.
+ * Page of a library movie (layout in MovieDetailLayout). The backdrop header holds
+ * everything needed at a glance: poster, title, director, key facts and the main action
+ * (play, or what stands in for it: server progress, release date, quality and new
+ * search). The summary follows below.
  */
 export function MovieDetailView({
   movie,
@@ -68,6 +70,7 @@ export function MovieDetailView({
   onCancelServerQueue,
   qualityProfiles,
   onChangeQuality,
+  isJustAdded = false,
 }: Readonly<MovieDetailViewProps>) {
   const [qualityOverride, setQualityOverride] = useState<number | null>(null);
   const [isSearchingQuality, setIsSearchingQuality] = useState(false);
@@ -81,8 +84,10 @@ export function MovieDetailView({
   const isPlayable = isLocalMovie || isServerAvailable;
   const isDownloading = download?.status === 'downloading';
   const isPaused = download?.status === 'paused';
+  const isFailed = download?.status === 'error';
   const fanartUrl = getImageUrl(movie, 'fanart');
   const posterUrl = getImageUrl(movie, 'poster');
+  const directors = useMovieDirectors(movie.id);
   const queueId = queueItem?.id ?? queueItem?.movieId;
   const deleteLabel = isLocalMovie ? 'Supprimer du disque local' : 'Supprimer du serveur';
 
@@ -107,40 +112,46 @@ export function MovieDetailView({
     </button>
   );
 
+  // Round glass button of the delete button's family (pause, resume, cancel)
+  const roundButton = (label: string, icon: ReactNode, onClick: () => void, danger = false) => (
+    <button
+      type="button"
+      className={`movie-detail-quiet movie-detail-quiet--icon${danger ? ' movie-detail-quiet--danger' : ''}`}
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+    >
+      {icon}
+    </button>
+  );
+
   const renderServerQueue = (item: QueueRecord) => {
-    const progress = item.size > 0 ? Math.round(((item.size - item.sizeleft) / item.size) * 100) : 0;
-    const sizeStr =
-      item.size > 0 ? `${formatSize(item.size - item.sizeleft)} / ${formatSize(item.size)}` : '';
+    const downloaded = Math.max(0, item.size - item.sizeleft);
+    // Nothing received yet: "En attente" and a sober moving bar, not an empty one
+    const hasStarted = item.size > 0 && downloaded > 0;
+    const details = hasStarted
+      ? [
+          `${formatSize(downloaded)} sur ${formatSize(item.size)}`,
+          formatTimeLeft(parseQueueTimeLeft(item.timeleft)),
+        ].filter(Boolean)
+      : ['En attente'];
 
     return (
-      <section className="movie-detail-panel" aria-labelledby="movie-detail-queue-title">
-        <div className="movie-detail-panel-header">
-          <CloudDownload className="movie-detail-panel-icon movie-detail-panel-icon--server" size={18} aria-hidden="true" />
-          <h3 className="movie-detail-panel-title" id="movie-detail-queue-title">
-            Téléchargement sur le serveur
-          </h3>
-          <span className="movie-detail-panel-value movie-detail-panel-value--server">{progress}&nbsp;%</span>
-          {queueId !== undefined && (
-            <IconButton
-              icon={<X size={16} aria-hidden="true" />}
-              variant="danger"
-              size="sm"
-              className="movie-detail-panel-action"
-              onClick={() => setShowCancelServerQueueConfirm(true)}
-              title="Annuler le téléchargement sur le serveur"
-              aria-label="Annuler le téléchargement sur le serveur"
-            />
-          )}
-        </div>
-        <ProgressBar value={progress} variant="server" size="md" />
-        {(sizeStr || item.timeleft) && (
-          <p className="movie-detail-panel-stats">
-            {sizeStr && <span>{sizeStr}</span>}
-            {item.timeleft && <span>Temps restant&nbsp;: {item.timeleft}</span>}
-          </p>
-        )}
-        <p className="movie-detail-panel-note">Le film pourra être lancé dès la fin du téléchargement.</p>
-      </section>
+      <TransferStatus
+        id="movie-detail-queue"
+        title="Téléchargement sur le serveur"
+        details={details}
+        progress={hasStarted ? (downloaded / item.size) * 100 : null}
+        actions={
+          queueId !== undefined &&
+          roundButton(
+            'Annuler le téléchargement sur le serveur',
+            <X size={18} aria-hidden="true" />,
+            () => setShowCancelServerQueueConfirm(true),
+            true
+          )
+        }
+      />
     );
   };
 
@@ -161,42 +172,41 @@ export function MovieDetailView({
     if (qualitySearchOk === true) qualityStatus = 'Recherche lancée sur Radarr';
     else if (qualitySearchOk === false) qualityStatus = 'Échec de la modification';
 
+    // Just added: the server search has only started, "not found" would be premature
+    let stateIcon = <SearchX className="movie-detail-state-icon" size={20} aria-hidden="true" />;
+    let stateTitle = 'Introuvable dans cette qualité';
+    let stateDetail =
+      'Aucune version de ce film n’a été trouvée pour cette qualité. Essayez-en une autre et relancez la recherche.';
+    if (isUpcoming) {
+      stateIcon = <CalendarClock className="movie-detail-state-icon" size={20} aria-hidden="true" />;
+      stateTitle = describeUpcomingRelease(movie);
+      stateDetail = 'Il sera téléchargé sur le serveur dès sa sortie.';
+    } else if (isJustAdded) {
+      stateIcon = <Search className="movie-detail-state-icon" size={20} aria-hidden="true" />;
+      stateTitle = 'Recherche en cours sur le serveur';
+      stateDetail = 'Le film a été ajouté. Son téléchargement sur le serveur commencera dès qu’une version sera trouvée.';
+    }
+
     return (
       <div className="movie-detail-missing">
         <div className="movie-detail-state">
-          {isUpcoming ? (
-            <CalendarClock className="movie-detail-state-icon" size={20} aria-hidden="true" />
-          ) : (
-            <SearchX className="movie-detail-state-icon" size={20} aria-hidden="true" />
-          )}
+          {stateIcon}
           <div className="movie-detail-state-text">
-            <p className="movie-detail-state-title">
-              {isUpcoming ? describeUpcomingRelease(movie) : 'Introuvable dans cette qualité'}
-            </p>
-            <p className="movie-detail-state-detail">
-              {isUpcoming
-                ? 'Il sera téléchargé sur le serveur dès sa sortie.'
-                : 'Aucune version de ce film n’a été trouvée pour cette qualité. Essayez-en une autre et relancez la recherche.'}
-            </p>
+            <p className="movie-detail-state-title">{stateTitle}</p>
+            <p className="movie-detail-state-detail">{stateDetail}</p>
           </div>
         </div>
 
-        <div className="movie-detail-actions movie-detail-actions--quality">
+        {/* One row: main action, quality, then the destructive action at the end */}
+        <div className="movie-detail-actions">
           {qualityProfiles.length > 0 && (
             <>
-              <Select
-                label="Qualité"
-                value={selectedQualityId ?? ''}
-                onChange={e => setQualityOverride(Number(e.target.value))}
-                options={qualityProfiles.map(qp => ({ value: qp.id, label: qp.name }))}
-                disabled={isSearchingQuality}
-                containerClassName="movie-detail-quality"
-              />
               <button
                 type="button"
                 className="movie-detail-search"
                 onClick={handleSearchWithQuality}
                 disabled={isSearchingQuality || !selectedQualityId}
+                aria-busy={isSearchingQuality}
               >
                 {isSearchingQuality ? (
                   <Loader2 size={18} className="animate-spin" aria-hidden="true" />
@@ -205,6 +215,12 @@ export function MovieDetailView({
                 )}
                 Relancer la recherche
               </button>
+              <QualityPicker
+                profiles={qualityProfiles}
+                value={selectedQualityId}
+                onChange={setQualityOverride}
+                disabled={isSearchingQuality}
+              />
             </>
           )}
           {deleteButton}
@@ -221,54 +237,60 @@ export function MovieDetailView({
     );
   };
 
-  const renderLocalDownload = () => {
-    const progress = download?.progress || 0;
+  const renderLocalDownload = (info: DownloadInfo) => {
+    const sizes = info.sizeStr ? info.sizeStr.replace(' / ', ' sur ') : '';
+    // Just started, no figure yet: a moving bar instead of an empty one
+    const isStarting = isDownloading && !sizes && !info.progress;
+
+    let title = 'Téléchargement sur cet ordinateur';
+    let state: 'active' | 'paused' | 'error' = 'active';
+    if (isPaused) {
+      title = 'Téléchargement en pause';
+      state = 'paused';
+    } else if (isFailed) {
+      title = 'Téléchargement interrompu';
+      state = 'error';
+    }
+
+    let details: string[];
+    if (isStarting) {
+      details = ['Démarrage'];
+    } else if (isDownloading) {
+      details = [
+        sizes,
+        info.speed ?? '',
+        formatTimeLeft(parseLocalTimeLeft(info.timeRemaining)),
+      ].filter(Boolean);
+    } else {
+      details = sizes ? [sizes] : [];
+    }
+
     return (
-      <section className="movie-detail-panel" aria-labelledby="movie-detail-download-title">
-        <div className="movie-detail-panel-header">
-          <Download className="movie-detail-panel-icon" size={18} aria-hidden="true" />
-          <h3 className="movie-detail-panel-title" id="movie-detail-download-title">
-            {isPaused ? 'Téléchargement en pause' : 'Téléchargement sur cet ordinateur'}
-          </h3>
-          <span className="movie-detail-panel-value">{progress}&nbsp;%</span>
-          <div className="movie-detail-panel-actions">
-            {isDownloading && (
-              <IconButton
-                icon={<Pause size={16} fill="currentColor" aria-hidden="true" />}
-                variant="ghost"
-                size="sm"
-                onClick={() => onCancelDownload(`movie-${movie.id}`)}
-                title="Mettre en pause"
-                aria-label="Mettre en pause"
-              />
+      <TransferStatus
+        id="movie-detail-download"
+        title={title}
+        details={details}
+        progress={isStarting ? null : info.progress || 0}
+        state={state}
+        actions={
+          <>
+            {isDownloading &&
+              roundButton('Mettre en pause', <Pause size={18} aria-hidden="true" />, () =>
+                onCancelDownload(`movie-${movie.id}`)
+              )}
+            {(isPaused || isFailed) &&
+              roundButton('Reprendre le téléchargement', <Play size={18} aria-hidden="true" />, () =>
+                onDownload(movie)
+              )}
+            {roundButton(
+              'Annuler le téléchargement',
+              <X size={18} aria-hidden="true" />,
+              () => setShowCancelDownloadConfirm(true),
+              true
             )}
-            {isPaused && (
-              <IconButton
-                icon={<Play size={16} fill="currentColor" aria-hidden="true" />}
-                variant="ghost"
-                size="sm"
-                onClick={() => onDownload(movie)}
-                title="Reprendre le téléchargement"
-                aria-label="Reprendre le téléchargement"
-              />
-            )}
-            <IconButton
-              icon={<X size={16} aria-hidden="true" />}
-              variant="danger"
-              size="sm"
-              onClick={() => setShowCancelDownloadConfirm(true)}
-              title="Annuler le téléchargement"
-              aria-label="Annuler le téléchargement"
-            />
-          </div>
-        </div>
-        <ProgressBar value={progress} isPaused={isPaused} size="md" />
-        <p className="movie-detail-panel-stats">
-          <span>{download?.sizeStr || download?.stats}</span>
-          {isDownloading && download?.speed && <span>{download.speed}</span>}
-          {isDownloading && download?.timeRemaining && <span>Reste {download.timeRemaining}</span>}
-        </p>
-      </section>
+          </>
+        }
+      />
     );
   };
 
@@ -279,7 +301,7 @@ export function MovieDetailView({
           <Play className="movie-detail-play-icon" size={22} fill="currentColor" aria-hidden="true" />
           Lancer le film
         </button>
-        {!isLocalMovie && !isDownloading && !isPaused && (
+        {!isLocalMovie && !isDownloading && !isPaused && !isFailed && (
           <button type="button" className="movie-detail-quiet" onClick={() => onDownload(movie)}>
             <Download size={18} aria-hidden="true" />
             Télécharger
@@ -287,7 +309,7 @@ export function MovieDetailView({
         )}
         {deleteButton}
       </div>
-      {(isDownloading || isPaused) && renderLocalDownload()}
+      {download && (isDownloading || isPaused || isFailed) && renderLocalDownload(download)}
     </>
   );
 
@@ -298,45 +320,30 @@ export function MovieDetailView({
   };
 
   return (
-    <article
-      className={`movie-detail${posterUrl ? ' movie-detail--with-poster' : ''}`}
-      aria-labelledby={MOVIE_DETAIL_HEADING_ID}
+    <MovieDetailLayout
+      title={movie.title}
+      fanartUrl={fanartUrl}
+      posterUrl={posterUrl}
+      credit={
+        directors.length > 0 ? (
+          <>
+            {/* The name alone on screen, with its meaning for screen readers */}
+            <span className="sr-only">Réalisé par </span>
+            {formatNameList(directors)}
+          </>
+        ) : undefined
+      }
+      facts={
+        <>
+          {movie.year > 0 && <li>{movie.year}</li>}
+          {movie.runtime ? <li>{formatDuration(movie.runtime)}</li> : null}
+          {movie.movieFile && <li>{formatSize(movie.movieFile.size)}</li>}
+        </>
+      }
+      primary={renderPrimary()}
+      notices={notices}
+      overview={movie.overview}
     >
-      <header className="movie-detail-hero">
-        {fanartUrl && (
-          <div
-            className="movie-detail-backdrop"
-            style={{ backgroundImage: `url(${fanartUrl})` }}
-            aria-hidden="true"
-          />
-        )}
-
-        <div className="movie-detail-hero-inner">
-          {posterUrl && <img className="movie-detail-poster" src={posterUrl} alt="" />}
-          <div className="movie-detail-intro">
-            <h2 className="movie-detail-title" id={MOVIE_DETAIL_HEADING_ID} tabIndex={-1}>
-              {movie.title}
-            </h2>
-            <ul className="movie-detail-facts" aria-label="Informations">
-              {movie.year > 0 && <li>{movie.year}</li>}
-              {movie.runtime ? <li>{formatDuration(movie.runtime)}</li> : null}
-              {movie.movieFile && <li>{formatSize(movie.movieFile.size)}</li>}
-            </ul>
-            <div className="movie-detail-primary">{renderPrimary()}</div>
-          </div>
-        </div>
-      </header>
-
-      <div className="movie-detail-body">
-        {notices}
-        <section className="movie-detail-section" aria-labelledby="movie-detail-overview-title">
-          <h3 className="movie-detail-section-title" id="movie-detail-overview-title">
-            Résumé
-          </h3>
-          <p className="movie-detail-overview">{movie.overview || 'Aucun résumé disponible.'}</p>
-        </section>
-      </div>
-
       <ConfirmModal
         isOpen={showDeleteConfirm}
         title={isLocalMovie ? 'Supprimer le téléchargement' : 'Supprimer du serveur'}
@@ -403,6 +410,6 @@ export function MovieDetailView({
         }}
         onClose={() => setShowCancelServerQueueConfirm(false)}
       />
-    </article>
+    </MovieDetailLayout>
   );
 }

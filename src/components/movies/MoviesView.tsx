@@ -17,7 +17,8 @@ interface MoviesViewProps {
   readonly findInLibrary: (tmdbId: number) => Movie | undefined;
   /** Opens the detail page; `trigger` takes the focus back when it closes. */
   readonly onSelectMovie: (movie: Movie, trigger: HTMLElement) => void;
-  readonly onOpenAddMovie: (lookupMovie: LookupMovie) => void;
+  /** Opens the page that adds a search result; `trigger` takes the focus back when it closes. */
+  readonly onOpenAddMovie: (lookupMovie: LookupMovie, trigger: HTMLElement) => void;
   readonly isConfigLoaded: boolean;
   readonly isConfigured: boolean;
   readonly hasLoaded: boolean;
@@ -72,7 +73,7 @@ export function MoviesView({
                 if (libraryMovie) {
                   onSelectMovie(libraryMovie, event.currentTarget);
                 } else {
-                  onOpenAddMovie(lookupMovie);
+                  onOpenAddMovie(lookupMovie, event.currentTarget);
                 }
               }}
             />

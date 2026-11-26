@@ -38,6 +38,15 @@ export interface LookupMovie {
   ratings?: { imdb?: { value: number } };
 }
 
+/** Radarr credit (`GET /api/v3/credit?movieId=`), only the fields we read. */
+export interface MovieCredit {
+  personName?: string;
+  /** `cast` or `crew` */
+  type?: string;
+  /** Crew job, for example `Director` */
+  job?: string;
+}
+
 export interface QualityProfile {
   id: number;
   name: string;

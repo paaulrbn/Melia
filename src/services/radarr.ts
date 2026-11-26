@@ -1,4 +1,4 @@
-import { LookupMovie, Movie, QualityProfile, QueueRecord } from '../types';
+import { LookupMovie, Movie, MovieCredit, QualityProfile, QueueRecord, RootFolder } from '../types';
 import { normalizeRootFolder } from '../utils/formatters';
 import { invokeSynced } from './runtime';
 
@@ -22,12 +22,22 @@ export async function fetchRadarrMovie(movieId: number): Promise<Movie> {
   return JSON.parse(await radarrRequest('GET', `/api/v3/movie/${movieId}`));
 }
 
+export async function fetchRadarrCredits(movieId: number): Promise<MovieCredit[]> {
+  const data: unknown = JSON.parse(await radarrRequest('GET', `/api/v3/credit?movieId=${movieId}`));
+  return Array.isArray(data) ? data : [];
+}
+
 export async function searchRadarrMovies(term: string): Promise<LookupMovie[]> {
   return JSON.parse(await radarrRequest('GET', `/api/v3/movie/lookup?term=${encodeURIComponent(term)}`));
 }
 
 export async function fetchQualityProfiles(): Promise<QualityProfile[]> {
   return JSON.parse(await radarrRequest('GET', '/api/v3/qualityprofile'));
+}
+
+export async function fetchRadarrRootFolders(): Promise<RootFolder[]> {
+  const data: unknown = JSON.parse(await radarrRequest('GET', '/api/v3/rootfolder'));
+  return Array.isArray(data) ? data : [];
 }
 
 export interface AddMovieParams {

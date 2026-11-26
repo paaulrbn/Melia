@@ -3,7 +3,9 @@ import { Config, DownloadInfo, LookupMovie, Movie, QualityProfile, QueueRecord }
 import { STORAGE_KEYS } from '../utils/constants';
 import { normalizeRootFolder } from '../utils/formatters';
 import { groupMovies } from '../utils/movieGroups';
+import { getImageUrl } from '../utils/media';
 import { useAdaptivePolling } from './useAdaptivePolling';
+import { usePreloadImages } from './usePreloadImages';
 import {
   fetchRadarrMovies,
   fetchRadarrMovie,
@@ -268,22 +270,34 @@ export function useMovies({
     }
   }, [hasSelectedMovie, qualityProfiles.length, loadQualityProfiles]);
 
-  const openAddMovie = (lookupMovie: LookupMovie) => {
-    setAddingMovie(lookupMovie);
-    setAddMovieError(null);
-    setIsAddingMovie(false);
-    void loadQualityProfiles();
-  };
+  // Movie shown on the add page right now: an addition that ends after the page changed
+  // must not close or report on another movie's page
+  const addingMovieRef = useRef<LookupMovie | null>(null);
 
-  const closeAddMovie = () => {
+  const openAddMovie = useCallback(
+    (lookupMovie: LookupMovie) => {
+      addingMovieRef.current = lookupMovie;
+      setAddingMovie(lookupMovie);
+      setAddMovieError(null);
+      setIsAddingMovie(false);
+      void loadQualityProfiles();
+    },
+    [loadQualityProfiles]
+  );
+
+  const closeAddMovie = useCallback(() => {
+    addingMovieRef.current = null;
     setAddingMovie(null);
     setAddMovieError(null);
     setIsAddingMovie(false);
-  };
+  }, []);
 
-  const handleAddMovie = async (autoDownload: boolean = false) => {
-    if (!addingMovie || !selectedQuality || !radarrUrl || !radarrKey) return false;
+  /** Resolves to the movie created in Radarr, or null when the addition failed. */
+  const handleAddMovie = async (autoDownload: boolean = false): Promise<Movie | null> => {
+    if (!addingMovie || !selectedQuality || !radarrUrl || !radarrKey) return null;
     const cleanRoot = normalizeRootFolder(config['RADARR_ROOT_FOLDER'], '/movies');
+    const target = addingMovie;
+    const isStillShown = () => addingMovieRef.current === target;
 
     setIsAddingMovie(true);
     setAddMovieError(null);
@@ -291,9 +305,9 @@ export function useMovies({
     try {
       const createdMovie = await addRadarrMovie({
         rootFolder: cleanRoot,
-        tmdbId: addingMovie.tmdbId,
-        title: addingMovie.title,
-        year: addingMovie.year,
+        tmdbId: target.tmdbId,
+        title: target.title,
+        year: target.year,
         qualityProfileId: selectedQuality,
       });
 
@@ -314,14 +328,13 @@ export function useMovies({
       }
 
       await loadMovies();
-      closeAddMovie();
-      return true;
+      if (isStillShown()) closeAddMovie();
+      return createdMovie?.id ? createdMovie : null;
     } catch (e: unknown) {
-      const errMsg = parseRadarrErrorMessage(e);
-      setAddMovieError(errMsg);
-      return false;
+      if (isStillShown()) setAddMovieError(parseRadarrErrorMessage(e));
+      return null;
     } finally {
-      setIsAddingMovie(false);
+      if (isStillShown()) setIsAddingMovie(false);
     }
   };
 
@@ -381,6 +394,13 @@ export function useMovies({
     () => groupMovies(movies, downloads, radarrQueue),
     [movies, downloads, radarrQueue]
   );
+
+  // Warm up the grid posters in display order, so they are decoded before they are scrolled to
+  const posterUrls = useMemo(
+    () => movieGroups.flatMap(group => group.movies.map(movie => getImageUrl(movie, 'poster'))),
+    [movieGroups]
+  );
+  usePreloadImages(posterUrls);
 
   const handleCancelQueueItem = useCallback(async (queueId: number) => {
     if (!radarrUrl || !radarrKey) return;
