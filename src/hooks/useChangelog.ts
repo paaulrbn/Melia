@@ -30,6 +30,7 @@ export function useChangelog(appVersion?: string | null) {
     isOpen,
     version: appVersion ? appVersion.replace(/^v/, '').trim() : LATEST_CHANGELOG.version,
     groups: LATEST_CHANGELOG.groups,
+    date: LATEST_CHANGELOG.date,
     openChangelog,
     closeChangelog,
   };
