@@ -1,6 +1,11 @@
 /* ==========================================================================
    Base & Reset
    ========================================================================== */
+html {
+  /* No grey flash on click or tap: the controls draw their own pressed state */
+  -webkit-tap-highlight-color: transparent;
+}
+
 body {
   margin: 0;
   background-color: var(--bg-base);
@@ -9,10 +14,35 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
+  /* App chrome is not text: nothing gets selected by a click or a drag */
   user-select: none;
   -webkit-user-select: none;
   -webkit-user-drag: none;
   cursor: default;
+}
+
+/* macOS: the page is see-through so the window material shows where the layout lets it
+   (the sidebar panel). The content area paints the opaque background itself (layout.css). */
+:root.is-macos,
+:root.is-macos body,
+:root.is-macos #root {
+  background: transparent;
+}
+
+/* Reading text stays selectable and copyable, like a description in a native app.
+   Episode summaries sit in clickable rows: they keep the row's behaviour. */
+:where(
+  .overview,
+  .movie-detail-overview,
+  textarea,
+  input:not([type='checkbox'], [type='radio'], [type='button'], [type='submit'], [type='reset'], [type='range'])
+) {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+::selection {
+  background-color: color-mix(in srgb, var(--focus-ring-color) 45%, transparent);
 }
 
 /* ==========================================================================
@@ -60,8 +90,13 @@ textarea:disabled,
   cursor: not-allowed;
 }
 
-::-webkit-scrollbar {
-  display: none;
+/* Scrollbars. macOS: WebKit's native overlay scrollbars (thin, shown while scrolling,
+   following the system setting), drawn dark through color-scheme. Elsewhere: thin and
+   quiet instead of the platform's wide default. Strips that scroll sideways (season
+   tabs…) keep hiding theirs in their own rules. */
+:root:not(.is-macos) * {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.22) transparent;
 }
 
 /* ==========================================================================
@@ -95,6 +130,19 @@ textarea:disabled,
 
 .animate-spin {
   animation: spin 1s linear infinite;
+}
+
+/* Read by screen readers, not drawn (page headings shown by the sidebar or the tabs) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* Reduced motion: no movement or loops, fades and colour changes stay */

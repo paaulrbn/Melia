@@ -3,5 +3,6 @@ export * from './IconButton';
 export * from './Input';
 export * from './Select';
 export * from './Checkbox';
-export * from './Badge';
 export * from './ProgressBar';
+export * from './Poster';
+export * from './TransferBar';

@@ -2,26 +2,36 @@
    Design Tokens & CSS Variables
    ========================================================================== */
 :root {
-  /* Colors & Surfaces */
-  --bg-base: #0a0a0a;
-  --bg-surface: rgba(10, 10, 10, 0.7);
-  --bg-surface-solid: #141414; /* Modals: lighter than the cards they cover */
-  --surface-1: #111111;   /* Cards */
-  --surface-2: #1a1a1a;   /* Fields, lists */
-  --surface-3: #242424;   /* Hover */
-  --surface-4: #2e2e2e;   /* Strong hover */
-  --border-strong: #5e5e5e; /* Field outlines, 3:1 on the background */
-  --border-default: rgba(255, 255, 255, 0.12); /* Quiet outline of a control at rest */
-  --border-subtle: rgba(255, 255, 255, 0.07);  /* Layout separators: sidebar edge, under the top row */
+  /* Colors & Surfaces: macOS dark grouped scale, neutral greys, each step clearly apart.
+     OKLCH lightness: base 0.235, cards 0.293 (+5.8), sheets 0.317, fields 0.341
+     (+4.8 over a card), hover 0.379, strong hover 0.417. */
+  --bg-base: #1e1e1e;     /* Window content */
+  --bg-base-rgb: 30 30 30; /* Same colour as channels, for scrims and translucent bars */
+  --bg-surface: rgb(var(--bg-base-rgb) / 0.7);
+  --bg-surface-solid: #323232; /* Modals: lighter than the cards they cover */
+  --surface-1: #2c2c2c;   /* Cards, grouped sections (settings, downloads) */
+  --surface-2: #383838;   /* Fields, lists, nested rows */
+  --surface-3: #424242;   /* Hover */
+  --surface-4: #4c4c4c;   /* Strong hover */
+  --border-strong: #757575; /* Field outlines, 3:1 on a card (--surface-1), 3.6:1 on the background */
+  --border-default: rgba(255, 255, 255, 0.14); /* Quiet outline of a control at rest */
+  --border-subtle: rgba(255, 255, 255, 0.09);  /* Separators: card edges, rows inside a card, sidebar edge */
   --text-primary: rgba(255, 255, 255, 0.95);
-  --text-secondary: rgba(255, 255, 255, 0.7);
-  --text-tertiary: rgba(255, 255, 255, 0.45);
-  --text-placeholder: rgba(255, 255, 255, 0.5); /* Placeholders and key hints, 5.2:1 on --surface-2 */
+  --text-secondary: rgba(255, 255, 255, 0.7);  /* 5.9:1 on --surface-3 */
+  --text-tertiary: rgba(255, 255, 255, 0.58);  /* 5.1:1 on --surface-2, 4.6:1 on --surface-3 */
+  --text-placeholder: rgba(255, 255, 255, 0.6); /* Placeholders and key hints, 5.4:1 on --surface-2 */
+  /* Icons: the text greys above flattened onto --bg-base, so opaque. A translucent stroke
+     gets darker where two strokes overlap (the panel line of PanelLeft, the arrow tips). */
+  --icon-primary: #f4f4f4;   /* = --text-primary (0.95) */
+  --icon-hover: #d2d2d2;     /* = --sidebar-text-hover (0.8) */
+  --icon-secondary: #bcbcbc; /* = --text-secondary (0.7) */
+  --icon-tertiary: #a0a0a0;  /* = --text-tertiary (0.58) */
+  --icon-disabled: #5d5d5d;  /* = --text-secondary at 0.4 */
   --accent-primary: #E50914; /* Cinematic Red */
-  --fill-primary: #ffffff;       /* Main action of a page (Play): --bg-base text, 19.8:1 */
-  --fill-primary-hover: #e0e0e0; /* Its hover: slightly grey, solid, --bg-base text 15:1 */
-  --accent-text: #ff3b44;    /* Red for small text, 4.5:1 on the background */
-  --danger: #ff4d4f;         /* Errors and destructive actions */
+  --fill-primary: #ffffff;       /* Main action of a page (Play): --bg-base text, 16.7:1 */
+  --fill-primary-hover: #e0e0e0; /* Its hover: slightly grey, solid, --bg-base text 12.6:1 */
+  --accent-text: #ff6870;    /* Red for small text, 4.5:1 up to a sheet (--bg-surface-solid) */
+  --danger: #ff6b6d;         /* Errors and destructive actions, 4.6:1 on a sheet, 5:1 on a card */
   --accent-server: #0071eb;
 
   /* Status Colors */
@@ -29,10 +39,51 @@
   --status-server: #3b82f6;
   --status-unavailable: #6b7280;
 
-  /* Typography: Outfit in Sentence Case / Title Case */
-  --font-heading: 'Outfit Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-body: 'Outfit Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-display: 'Outfit Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* Typography: the Apple system font (SF Pro). WebKit picks the Text or Display cut
+     and its optical tracking by size; other platforms fall back to their UI font. */
+  --font-heading: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, 'Segoe UI', Roboto, sans-serif;
+
+  /* Corner radii (macOS 26): rounder controls, capsules for toolbar items and buttons */
+  --radius-xs: 4px;     /* Checkboxes, key hints */
+  --radius-sm: 8px;     /* Small fields, small icon buttons */
+  --radius-md: 10px;    /* Fields, pop-up buttons */
+  --radius-lg: 14px;    /* Cards inside a sheet */
+  --radius-sheet: 26px; /* Modals and confirmations */
+  --radius-pill: 999px; /* Push buttons, search field, toolbar buttons */
+
+  /* Liquid Glass: light translucent fills, a hairline edge and a soft highlight on top */
+  --glass-fill: rgb(255 255 255 / 0.07);
+  --glass-fill-hover: rgb(255 255 255 / 0.12);
+  --glass-fill-active: rgb(255 255 255 / 0.16);
+  --glass-edge: rgb(255 255 255 / 0.12);
+  --glass-highlight: inset 0 1px 0 rgb(255 255 255 / 0.08);
+  --glass-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
+  --sheet-shadow: 0 24px 64px rgb(0 0 0 / 0.55), 0 0 0 0.5px rgb(255 255 255 / 0.16);
+
+  /* Keyboard focus: the system accent where WebKit exposes it, macOS blue otherwise */
+  --focus-ring-color: rgb(10 132 255 / 0.75);
+  --focus-ring: 3px solid var(--focus-ring-color);
+  --focus-ring-offset: 1px;
+
+  /* Sidebar flush with the window edges (Finder style) */
+  --sidebar-row-height: 32px;     /* Main entries (Films, Séries…): the whole row is the target */
+  --sidebar-subrow-height: 30px;  /* Library groups under "Films": rows touch (no gap), same pitch as before */
+  --sidebar-row-inset: 8px;       /* Selection inset from the sidebar edges */
+  --sidebar-row-padding: 10px;    /* Inline padding inside a row, before the icon */
+  --sidebar-row-gap: 8px;         /* Icon to label */
+  --sidebar-row-radius: 8px;      /* Shape of a row's focus ring (no fill) */
+  --sidebar-fill: var(--surface-1);          /* Opaque by default (Windows, Linux) */
+  --sidebar-text: var(--text-tertiary);      /* Entries at rest */
+  --sidebar-text-hover: rgb(255 255 255 / 0.8);
+  --sidebar-text-active: var(--text-primary);
+  /* Dotted rail under "Films": white hook on the group on screen, grey one on the group
+     under the pointer or the keyboard focus */
+  --sidebar-rail-active: rgb(255 255 255 / 0.8);
+  --sidebar-rail-hover: rgb(255 255 255 / 0.28);
+  --sidebar-rail-dur: 250ms; /* Same as tabs sliding (transitions.dev) */
+  --sidebar-rail-ease: var(--ease-smooth-out);
 
   /* Modular Scale (Major Third 1.250) */
   --text-2xs: 0.75rem;    /* 12px - badges, micro labels */
@@ -79,6 +130,20 @@
   --text-swap-dur: var(--duration-quick); /* 150ms */
   --text-swap-blur: var(--blur-small);
   --text-swap-ease: var(--ease-in-out);
+  /* Top tabs (sidebar hidden): they come in once the sidebar has started to leave, from
+     its side, one after the other; they leave faster, all at once, as it comes back */
+  --duration-stagger: 40ms;  /* Per-item stagger offset */
+  --top-tabs-enter-dur: 250ms;
+  --top-tabs-enter-delay: var(--duration-micro); /* 80ms */
+  --top-tabs-exit-dur: var(--duration-quick);    /* 150ms */
+  --top-tabs-ease: var(--ease-smooth-out);
+  --top-tabs-distance: 8px;
+  --top-tabs-label-distance: 4px;
+  --top-tabs-blur: var(--blur-small);
+  --top-tabs-exit-scale: 0.98;
+  /* Tabs sliding: active pill moving between tabs */
+  --tabs-dur: 250ms;
+  --tabs-ease: var(--ease-smooth-out);
   /* Page side-by-side: movie list and movie detail page */
   --page-slide-dur: 250ms;
   --page-fade-dur: 250ms;
@@ -88,12 +153,48 @@
   --page-exit-enabled: 1;
   --page-slide-ease: var(--ease-smooth-out);
   --page-fade-ease: var(--ease-smooth-out);
-  --titlebar-height: 52px;  /* Top row: traffic lights (trafficLightPosition x 20, y 22), logo, sidebar toggle, page title and search */
+  /* Trackpad swipe back (Safari-like): the movie page follows the fingers to the right,
+     1:1, the page below comes from a quarter to the left and brightens in step. The end
+     (duration and curve) continues the gesture's speed: computed by useBackForward. */
+  --swipe-parallax: -25%;      /* Page below, at the start of the swipe */
+  --swipe-dim: 0.6;            /* Its opacity at the start, over the dark content background */
+  --swipe-edge-shadow: -12px 0 32px rgb(0 0 0 / 0.45); /* Leading edge of the page leaving */
+  --swipe-hint-distance: 24px; /* Forward hint: slides in from the trailing edge */
+  --titlebar-height: 52px;  /* Top row: traffic lights (trafficLightPosition x 20, y 29), logo, sidebar toggle, page title and search */
   --content-max-width: 1600px; /* Content column of the libraries */
   --view-narrow-width: 900px;  /* Content column of the downloads and settings pages */
   --detail-max-width: 1120px;  /* Content column of the movie detail page (backdrop excluded) */
   --window-controls-width: 76px; /* Window edge to the end of the traffic lights: 20 inset + 3 buttons */
-  --sidebar-width: 232px;   /* Longest entry ("Téléchargements" + badge) with room to grow */
+  --sidebar-width: 232px;   /* Longest entry ("Téléchargements" + count) with room to grow */
   --search-max-width: 26rem;  /* Page search in the top row: 416px, shrinks down to --search-min-width */
   --search-min-width: 12rem;
+  --search-collapsed-min-width: 8rem; /* Next to the top tabs (sidebar hidden), on the narrowest window */
+  /* Trailing item inside the search capsule (shortcut hint, clear button): the same gap
+     above, below and after it, so it sits concentric with the field */
+  --search-height: 36px;       /* Same as the small field (.ui-input-container--sm) */
+  --search-border-width: 1px;
+  --search-inset: 6px;         /* Outer edge of the field to the item */
+  --search-item-height: calc(var(--search-height) - 2 * var(--search-inset)); /* 24px */
+
+  /* Native scrollbars, form controls and selection drawn for a dark appearance */
+  color-scheme: dark;
+}
+
+@supports (color: color-mix(in srgb, AccentColor 75%, transparent)) {
+  :root {
+    --focus-ring-color: color-mix(in srgb, AccentColor 75%, transparent);
+  }
+}
+
+/* macOS with the native window material (vibrancy) behind a transparent webview:
+   the sidebar lets it through with a light tint */
+:root.is-macos {
+  --sidebar-fill: rgb(28 28 30 / 0.38);
+}
+
+/* Less transparency asked for: opaque sidebar, as on the other platforms */
+@media (prefers-reduced-transparency: reduce) {
+  :root.is-macos {
+    --sidebar-fill: var(--surface-1);
+  }
 }

@@ -2,7 +2,7 @@
    UI Primitives & Design System Components
    ========================================================================== */
 
-/* Button (.ui-btn) */
+/* Button (.ui-btn): macOS 26 push buttons are capsules; secondary ones are light glass */
 .ui-btn {
   display: inline-flex;
   align-items: center;
@@ -10,9 +10,14 @@
   gap: 8px;
   font-family: var(--font-body), sans-serif;
   font-weight: 600;
-  border-radius: 8px;
+  border-radius: var(--radius-pill);
   border: 1px solid transparent;
-  transition: var(--transition-smooth);
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    border-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out),
+    opacity var(--duration-quick) var(--ease-out),
+    scale var(--duration-quick) var(--ease-out);
   text-decoration: none;
   user-select: none;
   white-space: nowrap;
@@ -21,9 +26,23 @@
   flex-shrink: 0;
 }
 
+.ui-btn:hover:not(:disabled) {
+  transition-duration: var(--duration-micro);
+}
+
+.ui-btn:active:not(:disabled) {
+  scale: 0.96;
+}
+
 .ui-btn:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.6);
-  outline-offset: 2px;
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-btn:active:not(:disabled) {
+    scale: none;
+  }
 }
 
 .ui-btn:disabled,
@@ -36,47 +55,43 @@
 .ui-btn--sm {
   height: 32px;
   padding: 0 14px;
-  font-size: 0.85rem;
-  border-radius: 6px;
+  font-size: var(--text-xs);
 }
 
 .ui-btn--md {
   height: 40px;
   padding: 0 18px;
-  font-size: 0.92rem;
-  border-radius: 8px;
+  font-size: var(--text-sm);
 }
 
 .ui-btn--lg {
   height: 48px;
   padding: 0 26px;
-  font-size: 0.98rem;
-  letter-spacing: 0.02em;
-  border-radius: 10px;
+  font-size: var(--text-base);
 }
 
 .ui-btn--primary {
-  background-color: #ffffff;
+  background-color: var(--fill-primary);
   color: #000000;
-  border-color: #ffffff;
+  border-color: var(--fill-primary);
 }
 
 .ui-btn--primary:hover:not(:disabled) {
-  background-color: rgba(255, 255, 255, 0.85);
-  border-color: rgba(255, 255, 255, 0.85);
-  transform: scale(1.02);
+  background-color: var(--fill-primary-hover);
+  border-color: var(--fill-primary-hover);
 }
 
 .ui-btn--secondary {
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: var(--glass-fill);
   color: var(--text-primary);
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: var(--glass-edge);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
 }
 
 .ui-btn--secondary:hover:not(:disabled) {
-  background-color: var(--surface-4);
+  background-color: var(--glass-fill-hover);
   color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.25);
+  border-color: rgb(255 255 255 / 0.18);
 }
 
 .ui-btn--ghost {
@@ -86,7 +101,7 @@
 }
 
 .ui-btn--ghost:hover:not(:disabled) {
-  background-color: var(--surface-3);
+  background-color: var(--glass-fill-hover);
   color: #ffffff;
 }
 
@@ -123,19 +138,30 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: var(--text-secondary);
-  transition: var(--transition-smooth);
+  background: var(--glass-fill);
+  border: 1px solid var(--glass-edge);
+  color: var(--icon-secondary);
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    border-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out),
+    box-shadow var(--duration-quick) var(--ease-out),
+    opacity var(--duration-quick) var(--ease-out),
+    transform var(--duration-base) var(--ease-out);
   box-sizing: border-box;
   padding: 0;
   outline: none;
   flex-shrink: 0;
 }
 
+.ui-icon-btn:hover:not(:disabled) {
+  transition-duration: var(--duration-micro), var(--duration-micro), var(--duration-micro),
+    var(--duration-micro), var(--duration-micro), var(--duration-base);
+}
+
 .ui-icon-btn:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.6);
-  outline-offset: 2px;
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
 }
 
 .ui-icon-btn--circle {
@@ -143,7 +169,7 @@
 }
 
 .ui-icon-btn--rounded {
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 
 .ui-icon-btn--sm {
@@ -151,7 +177,7 @@
   height: 32px;
   min-width: 32px;
   min-height: 32px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 .ui-icon-btn--md {
@@ -159,7 +185,7 @@
   height: 40px;
   min-width: 40px;
   min-height: 40px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .ui-icon-btn--lg {
@@ -167,7 +193,7 @@
   height: 48px;
   min-width: 48px;
   min-height: 48px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
 }
 
 .ui-icon-btn--circle.ui-icon-btn--sm,
@@ -178,20 +204,20 @@
 
 .ui-icon-btn--default:hover:not(:disabled),
 .ui-icon-btn--secondary:hover:not(:disabled) {
-  background: var(--surface-4);
+  background: var(--glass-fill-hover);
   color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.25);
+  border-color: rgb(255 255 255 / 0.18);
 }
 
 .ui-icon-btn--primary {
-  background: #ffffff;
+  background: var(--fill-primary);
   color: #000000;
-  border-color: #ffffff;
+  border-color: var(--fill-primary);
 }
 
 .ui-icon-btn--primary:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.85);
-  box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+  background: var(--fill-primary-hover);
+  border-color: var(--fill-primary-hover);
 }
 
 .ui-icon-btn--ghost {
@@ -200,15 +226,14 @@
 }
 
 .ui-icon-btn--ghost:hover:not(:disabled) {
-  background: var(--surface-3);
+  background: var(--glass-fill-hover);
   color: #ffffff;
 }
 
 .ui-icon-btn--danger {
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--icon-secondary);
   border-color: transparent;
-  opacity: 1;
 }
 
 .ui-icon-btn--danger:hover:not(:disabled) {
@@ -217,9 +242,16 @@
   border-color: rgba(229, 9, 20, 0.25);
 }
 
+/* Disabled: an opaque grey, not opacity (it would darken the overlapping strokes) */
 .ui-icon-btn:disabled {
-  opacity: 0.4;
+  color: var(--icon-disabled);
   cursor: not-allowed;
+}
+
+.ui-icon-btn--primary:disabled {
+  background: var(--icon-disabled);
+  border-color: var(--icon-disabled);
+  color: var(--bg-base);
 }
 
 /* Input (.ui-input-*) */
@@ -247,18 +279,21 @@
   align-items: center;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
-  transition-property: background-color, border-color, box-shadow;
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 1px 1px rgb(0 0 0 / 0.2);
+  transition-property: background-color, border-color, box-shadow, outline-color;
   transition-duration: var(--duration-fast);
   transition-timing-function: var(--ease-out);
   box-sizing: border-box;
   width: 100%;
 }
 
+/* Focused field: the macOS focus ring around it (fields show it on click too) */
 .ui-input-container:focus-within {
-  border-color: rgba(255, 255, 255, 0.6);
+  border-color: var(--border-strong);
   background: rgba(255, 255, 255, 0.06);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
 }
 
 .ui-input-container--error {
@@ -268,19 +303,19 @@
 .ui-input-container--sm {
   height: 36px;
   min-height: 36px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 .ui-input-container--md {
   height: 42px;
   min-height: 42px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .ui-input-container--lg {
   height: 48px;
   min-height: 48px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
 }
 
 .ui-input-field {
@@ -401,30 +436,40 @@
   width: 100%;
   background-color: var(--surface-2);
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--glass-highlight);
   color: var(--text-primary);
   font-family: var(--font-body), sans-serif;
   outline: none;
-  transition: var(--transition-smooth);
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    border-color var(--duration-quick) var(--ease-out);
   box-sizing: border-box;
 }
 
 .ui-select-container--sm .ui-select-field {
   padding: 8px 32px 8px 12px;
-  font-size: 0.85rem;
-  border-radius: 6px;
+  font-size: var(--text-xs);
+  border-radius: var(--radius-sm);
 }
 
 .ui-select-container--md .ui-select-field {
   padding: 11px 36px 11px 14px;
-  font-size: 0.9rem;
-  border-radius: 8px;
+  font-size: var(--text-sm);
+  border-radius: var(--radius-md);
+}
+
+.ui-select-field:hover:not(:disabled) {
+  background-color: var(--surface-3);
 }
 
 .ui-select-field:focus {
-  border-color: rgba(255, 255, 255, 0.6);
   background-color: var(--surface-3);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.ui-select-field:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
 }
 
 .ui-select-field option {
@@ -437,7 +482,7 @@
   right: 12px;
   color: var(--text-secondary);
   pointer-events: none;
-  transition: var(--transition-smooth);
+  transition: color var(--duration-quick) var(--ease-out);
 }
 
 .ui-select-container:focus-within .ui-select-chevron {
@@ -483,7 +528,7 @@
 .ui-checkbox-custom {
   width: 18px;
   height: 18px;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   background-color: var(--surface-2);
   border: 1px solid rgba(255, 255, 255, 0.2);
   display: flex;
@@ -515,8 +560,8 @@
 }
 
 .ui-checkbox-input:focus-visible + .ui-checkbox-custom {
-  outline: 2px solid rgba(255, 255, 255, 0.6);
-  outline-offset: 2px;
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
 }
 
 .ui-checkbox-label {
@@ -530,53 +575,88 @@
   color: var(--text-primary);
 }
 
-/* Badge (.ui-badge) */
-.ui-badge {
-  font-family: var(--font-body), sans-serif;
-  font-size: 0.72rem;
-  font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-  border-radius: 999px;
-  box-sizing: border-box;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
+/* Poster (.ui-poster): hidden until loaded, then a short fade over the parent's
+   background. Cached images skip the fade (data-status="shown"). A keyframe fade, so the
+   element's own transitions (hover filter on the cards) stay untouched. */
+.ui-poster[data-status='pending'] {
+  opacity: 0;
 }
 
-.ui-badge--sm {
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  font-size: 0.65rem;
+.ui-poster[data-status='faded-in'] {
+  animation: ui-fade-in var(--duration-fast) var(--ease-in-out) both;
 }
 
-.ui-badge--md {
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
-  font-size: 0.72rem;
+@keyframes ui-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
-.ui-badge--accent {
-  background-color: var(--accent-primary);
-  color: #ffffff;
+@media (prefers-reduced-motion: reduce) {
+  .ui-poster[data-status='faded-in'] {
+    animation: none;
+  }
 }
 
-.ui-badge--server {
-  background-color: var(--status-server);
-  color: #ffffff;
+/* TransferBar (.ui-transfer-*): thin download bar of the movie page and the downloads
+   page. White on a grey track, grey when paused, red only on an error: the bar is the
+   one moving element, colour is kept for an interruption. */
+.ui-transfer-track {
+  position: relative;
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background-color: rgb(255 255 255 / 0.16);
 }
 
-.ui-badge--success {
-  background-color: var(--status-local);
-  color: #ffffff;
+/* Updates arrive every 1 to 3 s: a long ease-out glides from one to the next */
+.ui-transfer-fill {
+  height: 100%;
+  min-width: 4px;
+  border-radius: inherit;
+  background-color: var(--text-primary);
+  transition:
+    width 900ms var(--ease-out),
+    background-color var(--duration-quick) var(--ease-out);
 }
 
-.ui-badge--neutral {
-  background-color: rgba(255, 255, 255, 0.15);
-  color: var(--text-secondary);
+.ui-transfer-track[data-state='paused'] .ui-transfer-fill {
+  background-color: var(--text-tertiary);
+}
+
+.ui-transfer-track[data-state='error'] .ui-transfer-fill {
+  background-color: var(--danger);
+}
+
+/* Waiting: a short soft segment sweeps the track */
+.ui-transfer-track[data-indeterminate] .ui-transfer-fill {
+  width: 30%;
+  background-color: rgb(255 255 255 / 0.55);
+  animation: ui-transfer-sweep 1.6s ease-in-out infinite;
+}
+
+@keyframes ui-transfer-sweep {
+  from {
+    translate: -100% 0;
+  }
+  to {
+    translate: 340% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-transfer-fill {
+    transition: none;
+  }
+
+  /* Still track, the "En attente" text says it */
+  .ui-transfer-track[data-indeterminate] .ui-transfer-fill {
+    animation: none;
+    visibility: hidden;
+  }
 }
 
 /* ProgressBar (.ui-progress-*) */
