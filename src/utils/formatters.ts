@@ -1,9 +1,17 @@
+// One decimal with the French comma ("14,6"). No thousands grouping: a value never
+// goes above 1023,9 in its unit, so "1023,9 Mo" stays readable without a narrow space.
+const oneDecimal = new Intl.NumberFormat('fr-FR', {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+  useGrouping: false,
+});
+
 export function formatSize(bytes: number): string {
   if (bytes === 0) return '0\u00A0Ko';
   const units = ['o', 'Ko', 'Mo', 'Go', 'To'];
   const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
   const value = bytes / Math.pow(1024, i);
-  return `${i === 0 ? value : value.toFixed(1)}\u00A0${units[i]}`;
+  return `${i === 0 ? value : oneDecimal.format(value)}\u00A0${units[i]}`;
 }
 
 export function formatSpeed(bytesPerSec: number): string {
@@ -11,7 +19,7 @@ export function formatSpeed(bytesPerSec: number): string {
   const units = ['o/s', 'Ko/s', 'Mo/s', 'Go/s'];
   const i = Math.min(Math.floor(Math.log(bytesPerSec) / Math.log(1024)), units.length - 1);
   const value = bytesPerSec / Math.pow(1024, i);
-  return `${value.toFixed(1)}\u00A0${units[i]}`;
+  return `${oneDecimal.format(value)}\u00A0${units[i]}`;
 }
 
 export function formatTime(seconds: number): string {
