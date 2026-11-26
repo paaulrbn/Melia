@@ -26,7 +26,8 @@ function matchesNarrow(): boolean {
   return typeof window !== 'undefined' && window.matchMedia(NARROW_QUERY).matches;
 }
 
-/** Elements that slide with the sidebar when it is docked or hidden (content, page title, search). */
+/** Elements that slide with the sidebar when it is docked or hidden (content, back button, search).
+ *  The top tabs are not among them: they fade in and out on their own (layout.css). */
 const FOLLOW_SELECTOR = '[data-sidebar-follow]';
 
 function prefersReducedMotion(): boolean {

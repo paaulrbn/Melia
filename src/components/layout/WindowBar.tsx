@@ -1,4 +1,4 @@
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { PanelLeft } from 'lucide-react';
 import { IconButton } from '../ui';
 import { IS_MAC } from '../../hooks/useSidebar';
 
@@ -19,7 +19,8 @@ export function WindowBar({
   onToggleSidebar,
 }: Readonly<WindowBarProps>) {
   const label = isSidebarCollapsed ? 'Afficher la barre latérale' : 'Masquer la barre latérale';
-  const shortcut = IS_MAC ? 'Cmd+B' : 'Ctrl+B';
+  // Written the way each system writes it: ⌘B on macOS, Ctrl+B elsewhere
+  const shortcut = IS_MAC ? '⌘B' : 'Ctrl+B';
 
   return (
     <div className="window-bar" data-tauri-drag-region="true">
@@ -28,21 +29,8 @@ export function WindowBar({
         className="window-bar-toggle"
         variant="ghost"
         size="sm"
-        icon={
-          // Icon swap: both icons stay mounted in the same cell and cross-fade
-          <span
-            className="t-icon-swap"
-            data-state={isSidebarCollapsed ? 'open' : 'close'}
-            aria-hidden="true"
-          >
-            <span className="t-icon" data-icon="open">
-              <PanelLeftOpen size={18} />
-            </span>
-            <span className="t-icon" data-icon="close">
-              <PanelLeftClose size={18} />
-            </span>
-          </span>
-        }
+        // Same icon in both states (macOS): the label and aria-expanded carry the state
+        icon={<PanelLeft size={18} aria-hidden="true" />}
         aria-label={label}
         title={`${label} (${shortcut})`}
         aria-expanded={!isSidebarCollapsed}

@@ -2,9 +2,10 @@ import type { ReactNode } from 'react';
 import { Download, Film, Settings, Tv } from 'lucide-react';
 import { TabType } from '../../types';
 import { MovieGroup, MovieGroupKey } from '../../utils/movieGroups';
-import { Badge } from '../ui';
+import { MovieGroupTree } from './MovieGroupTree';
 
-const ICON_SIZE = 18;
+/** macOS sidebar icon size (medium rows), matches --sidebar-icon-size. */
+const ICON_SIZE = 16;
 
 interface SidebarProps {
   readonly id: string;
@@ -72,26 +73,11 @@ export function Sidebar({
               onClick={() => onSelectTab('movies')}
             />
             {movieGroups.length > 0 && (
-              <ul className="sidebar-sublist" aria-label="Groupes de films">
-                {movieGroups.map(group => {
-                  const count = group.movies.length;
-                  const isCurrent = group.key === activeMovieGroup;
-                  return (
-                    <li key={group.key}>
-                      <button
-                        type="button"
-                        className={`sidebar-sublink${isCurrent ? ' is-current' : ''}`}
-                        aria-current={isCurrent ? 'true' : undefined}
-                        aria-label={`${group.title}, ${count} ${count > 1 ? 'films' : 'film'}`}
-                        onClick={() => onSelectMovieGroup(group.key)}
-                      >
-                        <span className="sidebar-sublink-label">{group.title}</span>
-                        <span className="category-count">{count}</span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
+              <MovieGroupTree
+                groups={movieGroups}
+                activeKey={activeMovieGroup}
+                onSelect={onSelectMovieGroup}
+              />
             )}
           </li>
           <li>
@@ -113,9 +99,9 @@ export function Sidebar({
               }
               trailing={
                 hasActiveDownloads && (
-                  <Badge variant="accent" className="sidebar-badge" aria-hidden="true">
+                  <span className="sidebar-link-count" aria-hidden="true">
                     {activeDownloadCount}
-                  </Badge>
+                  </span>
                 )
               }
             />

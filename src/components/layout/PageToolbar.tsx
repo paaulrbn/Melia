@@ -16,52 +16,55 @@ export interface PageToolbarSearch {
 }
 
 export interface PageToolbarBack {
-  /** True while a sub-page is open (movie detail): the button takes the title's place. */
+  /** True while a sub-page is open (movie detail): the button fades in. */
   readonly isShown: boolean;
-  /** Accessible name, e.g. "Retour aux films". The visible label is the page title. */
+  /** Accessible name, e.g. "Retour aux films". */
   readonly label: string;
+  /** Visible word after the chevron: the page it goes back to, e.g. "Films". */
+  readonly text: string;
   readonly onBack: () => void;
 }
 
 interface PageToolbarProps {
   /** Window bar (traffic lights, logo, sidebar toggle), kept mounted across pages. */
   readonly leading: ReactNode;
-  readonly title: string;
-  /** Back button shown in place of the title, with the same word, so the two never sit side by side. */
+  /** Back button of a sub-page (movie detail), on the content's leading edge. */
   readonly back?: PageToolbarBack;
-  /** Pages without a search (downloads, settings) only show their title. */
+  /** Page tabs, shown in the middle of the row while the sidebar is hidden. */
+  readonly tabs?: ReactNode;
+  /** True while the tabs are on screen (they stay mounted to fade in and out). */
+  readonly areTabsShown?: boolean;
+  /** Pages without a search (downloads, settings) leave the row empty there. */
   readonly search?: PageToolbarSearch;
-  /** Content column of the page, so the title lines up with it ('narrow': downloads, settings). */
-  readonly measure: 'wide' | 'narrow';
 }
 
 /**
- * Top row of the window: window bar and page title on the leading side, the page search
- * centred on the content below. The empty space stays a window drag area; the title lets
- * clicks fall through to it. On a sub-page, a back button replaces the title in the same
- * slot: its label stays where the title was, the chevron hangs in the margin before it.
+ * Top row of the window: window bar (and on a sub-page the back button) on the leading
+ * side, the page search centred on the content below. The page has no visible title here:
+ * the sidebar, or the tabs that replace it, already say where you are. While the sidebar
+ * is hidden, the tabs sit in the middle and the search moves to the trailing side.
+ * The empty space stays a window drag area.
  */
-export function PageToolbar({ leading, title, back, search, measure }: Readonly<PageToolbarProps>) {
+export function PageToolbar({ leading, back, tabs, areTabsShown = false, search }: Readonly<PageToolbarProps>) {
   const isBackShown = back?.isShown ?? false;
+  // Nothing over the content column (no back button, search or tabs): the material and
+  // its fade would only blur the page under an empty row, so it fades out
+  const isEmpty = !isBackShown && !search && !areTabsShown;
 
   return (
-    <header
-      className={`app-topbar${measure === 'narrow' ? ' app-topbar--narrow' : ''}`}
-      data-tauri-drag-region="true"
-    >
+    <header className="app-topbar" data-tauri-drag-region="true" data-empty={isEmpty ? 'true' : 'false'}>
       {/* Translucent material over the content column; slides with it when the sidebar toggles */}
       <div className="app-topbar-backdrop" data-sidebar-follow="" aria-hidden="true" />
       <div className="app-topbar-lead" data-tauri-drag-region="true">
         {leading}
-        <div
-          className="page-toolbar-heading"
-          data-state={isBackShown ? 'back' : 'title'}
-          data-sidebar-follow=""
-        >
-          <h2 className="page-toolbar-title">{title}</h2>
-          {/* No drag attribute: in Tauri only the clicked element counts, so the button
-              never moves the window. Kept mounted so it can fade out. */}
-          {back && (
+        {/* No drag attribute on the button: in Tauri only the clicked element counts, so it
+            never moves the window. Kept mounted so it can fade out. */}
+        {back && (
+          <div
+            className="page-toolbar-heading"
+            data-state={isBackShown ? 'back' : 'none'}
+            data-sidebar-follow=""
+          >
             <button
               type="button"
               className="page-toolbar-back"
@@ -71,11 +74,13 @@ export function PageToolbar({ leading, title, back, search, measure }: Readonly<
               onClick={back.onBack}
             >
               <ChevronLeft className="page-toolbar-back-icon" size={18} aria-hidden="true" />
-              <span className="page-toolbar-back-label">{title}</span>
+              <span className="page-toolbar-back-label">{back.text}</span>
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
+
+      {tabs}
 
       {/* Remounted per page so the field never carries one page's state to the other */}
       {search && <PageSearch key={search.label} search={search} />}

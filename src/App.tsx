@@ -1,5 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
-import { DownloadInfo, Episode, Movie, Series, TabType, UnifiedQueueItem } from './types';
+import { ChevronRight } from 'lucide-react';
+import { DownloadInfo, Episode, LookupMovie, Movie, Series, TabType, UnifiedQueueItem } from './types';
 import { useConfig } from './hooks/useConfig';
 import { useDownloads } from './hooks/useDownloads';
 import { useMovies } from './hooks/useMovies';
@@ -16,11 +17,14 @@ import { MovieGroupKey, movieGroupHeadingId, movieGroupSectionId } from './utils
 import { StatusBanner } from './components/common/StatusBanner';
 import { Sidebar } from './components/layout/Sidebar';
 import { PageToolbar, type PageToolbarSearch } from './components/layout/PageToolbar';
+import { TopTabs } from './components/layout/TopTabs';
+import { DETAIL_BACK_LABELS, PAGE_HEADING_ID, PAGE_TITLES } from './components/layout/navigation';
 import { UpdateBanner } from './components/layout/UpdateBanner';
 import { WindowBar } from './components/layout/WindowBar';
 import { MoviesView } from './components/movies/MoviesView';
-import { MOVIE_DETAIL_HEADING_ID, MovieDetailView } from './components/movies/MovieDetailView';
-import { AddMovieModal } from './components/movies/AddMovieModal';
+import { MovieDetailView } from './components/movies/MovieDetailView';
+import { MOVIE_DETAIL_HEADING_ID } from './components/movies/MovieDetailLayout';
+import { AddMovieView } from './components/movies/AddMovieView';
 import { SeriesView } from './components/series/SeriesView';
 import { SeriesDetailModal } from './components/series/SeriesDetailModal';
 import { AddSeriesModal } from './components/series/AddSeriesModal';
@@ -33,12 +37,24 @@ import './App.css';
 
 const SIDEBAR_ID = 'app-sidebar';
 
-const PAGE_TITLES: Record<TabType, string> = {
-  movies: 'Films',
-  series: 'Séries',
-  downloads: 'Téléchargements',
-  settings: 'Paramètres',
-};
+/** Content of the movie page: a library movie, or a search result to add */
+type DetailPage = { kind: 'movie'; movie: Movie } | { kind: 'add'; movie: LookupMovie };
+
+function detailPageKey(page: DetailPage): string {
+  return page.kind === 'movie' ? `movie-${page.movie.id}` : `add-${page.movie.tmdbId}`;
+}
+
+/** Page left with "back": what it showed and the page it was opened from. */
+interface ForwardEntry {
+  readonly page: DetailPage;
+  readonly from: TabType;
+}
+
+/** Laid out on screen: the tab views not shown stay mounted with `display: none`. */
+function isRendered(element: HTMLElement): boolean {
+  return element.isConnected && element.getClientRects().length > 0;
+}
+
 const EPISODE_ID_REGEX = /^episode-(\d+)$/;
 const EPISODE_SEASON_REGEX = /-s(\d+)e(\d+)/i;
 
@@ -260,95 +276,204 @@ function App() {
 
   const sidebar = useSidebar();
 
-  // Movie detail page: shown in the content area in place of the list, which stays
-  // mounted (and scrolled where it was) underneath.
-  const { selectedMovie, setSelectedMovie, selectMovie } = moviesManager;
+  // Movie page: shown in the content area in place of the list, which stays mounted (and
+  // scrolled where it was) underneath. Either a library movie, or a movie found by the
+  // search that can be added; never both.
+  const { selectedMovie, setSelectedMovie, selectMovie, addingMovie, openAddMovie, closeAddMovie } =
+    moviesManager;
+  // Page the movie page was opened from (Films, Téléchargements): it opens over that page,
+  // which stays selected in the sidebar, and "back" returns to it
+  const [detailFrom, setDetailFrom] = useState<TabType>('movies');
   // Library refreshes (queue end, focus, every 5 min) reach the open page
   const liveMovie = selectedMovie
     ? (moviesManager.movies.find(m => m.id === selectedMovie.id) ?? selectedMovie)
     : null;
-  const isMovieDetailOpen = activeTab === 'movies' && liveMovie !== null;
+  const openPage = useMemo<DetailPage | null>(() => {
+    if (activeTab !== detailFrom) return null;
+    if (liveMovie) return { kind: 'movie', movie: liveMovie };
+    if (addingMovie) return { kind: 'add', movie: addingMovie };
+    return null;
+  }, [activeTab, detailFrom, liveMovie, addingMovie]);
+  const isMovieDetailOpen = openPage !== null;
   // Kept after closing so the page can slide out, then dropped (see onTransitionEnd)
-  const [closingMovie, setClosingMovie] = useState<Movie | null>(null);
-  if (isMovieDetailOpen && liveMovie !== closingMovie) setClosingMovie(liveMovie);
-  const detailMovie = isMovieDetailOpen ? liveMovie : closingMovie;
-  const openMovieId = isMovieDetailOpen ? liveMovie.id : null;
+  const [closingPage, setClosingPage] = useState<DetailPage | null>(null);
+  if (openPage && openPage.movie !== closingPage?.movie) setClosingPage(openPage);
+  const detailPage = openPage ?? closingPage;
+  const detailMovie = detailPage?.kind === 'movie' ? detailPage.movie : null;
+  const openPageKey = openPage ? detailPageKey(openPage) : null;
+  // Movie added from the search a moment ago: its page says the server search has started
+  const [justAddedMovieId, setJustAddedMovieId] = useState<number | null>(null);
 
   const listPaneRef = useRef<HTMLDivElement>(null);
   const detailPaneRef = useRef<HTMLDivElement>(null);
-  // Poster that opened the page, and the movie whose poster takes the focus back on return
+  // Poster that opened the page, and (on return) the library movie whose poster takes the
+  // focus back when that poster is gone
   const detailTriggerRef = useRef<HTMLElement | null>(null);
-  const focusReturnMovieIdRef = useRef<number | null>(null);
+  const focusReturnRef = useRef<{ movieId: number | null } | null>(null);
+  // Bumped by every page change: an addition that ends later only moves on if nothing changed
+  const pageChangeRef = useRef(0);
 
-  // Page left with "back", reopened by "forward" (mouse button, swipe), like a browser.
-  // Only the detail page is in this history, not the tabs: any other way of leaving it
-  // (tab, sidebar group, search, another movie, deletion) forgets it.
-  const forwardMovieRef = useRef<Movie | null>(null);
+  // Page left with "back", reopened by "forward" (mouse button, swipe), like a browser,
+  // over the page it was opened from. Only the movie page is in this history, not the
+  // tabs: any other way of leaving it (tab, sidebar group, search, another movie,
+  // deletion) forgets it.
+  const forwardPageRef = useRef<ForwardEntry | null>(null);
 
+  /** `from`: the page it opens over and goes back to (Films unless said otherwise). */
   const openMovieDetail = useCallback(
-    (movie: Movie, trigger?: HTMLElement) => {
-      forwardMovieRef.current = null;
+    (movie: Movie, trigger?: HTMLElement, from: TabType = 'movies') => {
+      pageChangeRef.current += 1;
+      forwardPageRef.current = null;
       detailTriggerRef.current = trigger ?? null;
-      setActiveTab('movies');
+      setJustAddedMovieId(null);
+      closeAddMovie();
+      setDetailFrom(from);
+      setActiveTab(from);
       void selectMovie(movie);
     },
-    [selectMovie]
+    [selectMovie, closeAddMovie]
+  );
+
+  const openMovieDetailFromDownloads = useCallback(
+    (movie: Movie, trigger?: HTMLElement) => openMovieDetail(movie, trigger, 'downloads'),
+    [openMovieDetail]
+  );
+
+  // Search results only exist on the Films page
+  const openAddMovieDetail = useCallback(
+    (movie: LookupMovie, trigger?: HTMLElement) => {
+      pageChangeRef.current += 1;
+      forwardPageRef.current = null;
+      detailTriggerRef.current = trigger ?? null;
+      setSelectedMovie(null);
+      setDetailFrom('movies');
+      setActiveTab('movies');
+      openAddMovie(movie);
+    },
+    [setSelectedMovie, openAddMovie]
   );
 
   /** `restoreFocus`: going back. A tab, a group or the search keep their own focus. */
   const closeMovieDetail = useCallback(
     (restoreFocus: boolean) => {
-      forwardMovieRef.current = null;
-      focusReturnMovieIdRef.current = restoreFocus && selectedMovie ? selectedMovie.id : null;
+      pageChangeRef.current += 1;
+      forwardPageRef.current = null;
+      focusReturnRef.current = restoreFocus ? { movieId: selectedMovie?.id ?? null } : null;
       setSelectedMovie(null);
+      closeAddMovie();
     },
-    [selectedMovie, setSelectedMovie]
+    [selectedMovie, setSelectedMovie, closeAddMovie]
   );
 
   // One path for every "back": header button, Escape, mouse button, trackpad swipe
   const goBack = useCallback(() => {
-    if (!isMovieDetailOpen) return;
+    if (!openPage) return;
     closeMovieDetail(true);
-    forwardMovieRef.current = liveMovie;
-  }, [isMovieDetailOpen, closeMovieDetail, liveMovie]);
+    forwardPageRef.current = { page: openPage, from: detailFrom };
+  }, [openPage, detailFrom, closeMovieDetail]);
 
+  // Only from the page it was left for: a page opened from the downloads does not
+  // reappear over the movies, and the other way round
   const movies = moviesManager.movies;
   const goForward = useCallback(() => {
-    const movie = forwardMovieRef.current;
-    if (!movie || activeTab !== 'movies' || isMovieDetailOpen) return;
+    const entry = forwardPageRef.current;
+    if (!entry || activeTab !== entry.from || isMovieDetailOpen) return;
+    const { page, from } = entry;
+    if (page.kind === 'add') {
+      // Added in the meantime: its library page instead
+      const added = movies.find(m => m.tmdbId === page.movie.tmdbId);
+      if (added) openMovieDetail(added, undefined, from);
+      else openAddMovieDetail(page.movie);
+      return;
+    }
     // Removed from the library in the meantime: nothing to reopen
-    const current = movies.find(m => m.id === movie.id);
-    if (current) openMovieDetail(current);
-    else forwardMovieRef.current = null;
-  }, [activeTab, isMovieDetailOpen, movies, openMovieDetail]);
+    const current = movies.find(m => m.id === page.movie.id);
+    if (current) openMovieDetail(current, undefined, from);
+    else forwardPageRef.current = null;
+  }, [activeTab, isMovieDetailOpen, movies, openMovieDetail, openAddMovieDetail]);
+
+  const canGoForward = useCallback(() => {
+    const entry = forwardPageRef.current;
+    return entry !== null && activeTab === entry.from && !isMovieDetailOpen;
+  }, [activeTab, isMovieDetailOpen]);
 
   const appRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLElement>(null);
   useBackForward({
-    onBack: goBack,
+    onBack: source => {
+      goBack();
+      // Trackpad swipe: the page already slid out under the fingers, no fade-out left
+      if (source === 'swipe') setClosingPage(null);
+    },
     onForward: goForward,
     canGoBack: isMovieDetailOpen,
+    canGoForward,
     feedbackRef: appRef,
+    stageRef: contentRef,
   });
 
   // Opening: top of the page, focus on its title so it is announced. Closing: focus back
-  // on the poster, without scrolling the list, which kept its position.
+  // on what opened it (poster, download row), without scrolling the page, which kept its
+  // position; else on that movie elsewhere on the page, else on the page heading.
   useLayoutEffect(() => {
-    if (openMovieId !== null) {
+    if (openPageKey !== null) {
       if (detailPaneRef.current) detailPaneRef.current.scrollTop = 0;
       document.getElementById(MOVIE_DETAIL_HEADING_ID)?.focus({ preventScroll: true });
       return;
     }
-    const movieId = focusReturnMovieIdRef.current;
-    focusReturnMovieIdRef.current = null;
+    const focusReturn = focusReturnRef.current;
+    focusReturnRef.current = null;
     const list = listPaneRef.current;
-    if (movieId === null || !list) return;
+    if (focusReturn === null || !list) return;
     const trigger = detailTriggerRef.current;
-    const target =
-      trigger && list.contains(trigger)
-        ? trigger
-        : list.querySelector<HTMLElement>(`[data-movie-id="${movieId}"]`);
+    let target: HTMLElement | null = null;
+    if (trigger && list.contains(trigger) && isRendered(trigger)) target = trigger;
+    else if (focusReturn.movieId !== null) {
+      const candidates = list.querySelectorAll<HTMLElement>(`[data-movie-id="${focusReturn.movieId}"]`);
+      target = Array.from(candidates).find(isRendered) ?? null;
+    }
+    target ??= document.getElementById(PAGE_HEADING_ID);
     target?.focus({ preventScroll: true });
-  }, [openMovieId]);
+  }, [openPageKey]);
+
+  // Series page (a modal over the current page): same return of the focus. Closing gives it
+  // to what opened it (series row) if still there, else to that series elsewhere on the
+  // page, else to the page heading.
+  const { selectedSeries, selectSeries } = seriesManager;
+  const selectedSeriesId = selectedSeries?.id ?? null;
+  const seriesTriggerRef = useRef<HTMLElement | null>(null);
+  const seriesFocusReturnRef = useRef<{ seriesId: number | null } | null>(null);
+
+  const openSeries = useCallback(
+    (series: Series, trigger?: HTMLElement) => {
+      seriesTriggerRef.current = trigger ?? null;
+      seriesFocusReturnRef.current = null;
+      void selectSeries(series);
+    },
+    [selectSeries]
+  );
+
+  const closeSeries = useCallback(() => {
+    seriesFocusReturnRef.current = { seriesId: selectedSeriesId };
+    void selectSeries(null);
+  }, [selectedSeriesId, selectSeries]);
+
+  useLayoutEffect(() => {
+    if (selectedSeriesId !== null) return;
+    const focusReturn = seriesFocusReturnRef.current;
+    seriesFocusReturnRef.current = null;
+    const list = listPaneRef.current;
+    if (focusReturn === null || !list) return;
+    const trigger = seriesTriggerRef.current;
+    let target: HTMLElement | null = null;
+    if (trigger && list.contains(trigger) && isRendered(trigger)) target = trigger;
+    else if (focusReturn.seriesId !== null) {
+      const candidates = list.querySelectorAll<HTMLElement>(`[data-series-id="${focusReturn.seriesId}"]`);
+      target = Array.from(candidates).find(isRendered) ?? null;
+    }
+    target ??= document.getElementById(PAGE_HEADING_ID);
+    target?.focus({ preventScroll: true });
+  }, [selectedSeriesId]);
 
   // Escape goes back to the list, unless a confirmation is open or the key belongs to a field.
   // Capture phase: runs before the dialogs' own Escape handlers can remove them.
@@ -398,28 +523,38 @@ function App() {
   // Any tab, "Films" included, closes the detail page
   const selectTab = useCallback(
     (tab: TabType) => {
-      forwardMovieRef.current = null;
       setPendingMovieGroup(null);
-      setSelectedMovie(null);
+      closeMovieDetail(false);
       setActiveTab(tab);
     },
-    [setSelectedMovie]
+    [closeMovieDetail]
   );
 
   const { searchQuery, clearSearch, handleSearch } = searchManager;
+
+  // Added from its page: the movie joins the library and its page takes over, unless
+  // another page was opened (or this one left) while the addition was running
+  const handleAddMovie = async (autoDownload: boolean) => {
+    const pageChange = pageChangeRef.current;
+    const created = await moviesManager.handleAddMovie(autoDownload);
+    if (!created || pageChangeRef.current !== pageChange) return;
+    clearSearch();
+    openMovieDetail(created);
+    setJustAddedMovieId(created.id);
+  };
   const handleSelectMovieGroup = useCallback(
     (key: MovieGroupKey) => {
-      forwardMovieRef.current = null;
+      forwardPageRef.current = null;
       if (isMovieLibraryShown) {
         scrollToMovieGroup(key, true);
         return;
       }
       if (searchQuery) clearSearch();
-      setSelectedMovie(null);
+      closeMovieDetail(false);
       setActiveTab('movies');
       setPendingMovieGroup(key);
     },
-    [isMovieLibraryShown, scrollToMovieGroup, searchQuery, clearSearch, setSelectedMovie]
+    [isMovieLibraryShown, scrollToMovieGroup, searchQuery, clearSearch, closeMovieDetail]
   );
 
   useLayoutEffect(() => {
@@ -463,7 +598,7 @@ function App() {
   // Shown at the top of whichever page is visible, the movie detail page included
   const statusBanners = (
     <>
-      {activeTab === 'movies' && moviesManager.loadError && (
+      {(activeTab === 'movies' || isMovieDetailOpen) && moviesManager.loadError && (
         <StatusBanner
           title="Radarr injoignable"
           detail={moviesManager.loadError}
@@ -497,12 +632,17 @@ function App() {
     </>
   );
 
+  // Kept on every page a movie page can open over, so the button can fade in and out;
+  // it names the current page, which is the one the movie page goes back to
+  const backLabel = DETAIL_BACK_LABELS[activeTab];
+
   const appClassName = `melia-app${sidebar.isCollapsed ? ' is-sidebar-collapsed' : ''}`;
 
   return (
     <div className={appClassName} ref={appRef}>
-      {/* Top row: window controls, logo and toggle, then the page title (or, on the movie
-          detail page, the back button in its place) and search. Its empty space moves the window. */}
+      {/* Top row: window controls, logo and toggle, the back button on the movie detail
+          page, the page tabs while the sidebar is hidden, and the search. Its empty space
+          moves the window. */}
       <PageToolbar
         leading={
           <WindowBar
@@ -511,18 +651,27 @@ function App() {
             onToggleSidebar={sidebar.toggle}
           />
         }
-        title={PAGE_TITLES[activeTab]}
         back={
-          activeTab === 'movies'
+          backLabel
             ? {
                 isShown: isMovieDetailOpen,
-                label: 'Retour aux films',
+                label: openPage?.kind === 'add' ? 'Retour aux résultats' : backLabel,
+                text: PAGE_TITLES[activeTab],
                 onBack: goBack,
               }
             : undefined
         }
+        tabs={
+          <TopTabs
+            isShown={sidebar.isCollapsed}
+            activeTab={activeTab}
+            onSelectTab={selectTab}
+            activeDownloadCount={totalActiveDownloads}
+            sidebarId={SIDEBAR_ID}
+          />
+        }
+        areTabsShown={sidebar.isCollapsed}
         search={pageSearch}
-        measure={activeTab === 'downloads' || activeTab === 'settings' ? 'narrow' : 'wide'}
       />
 
       <Sidebar
@@ -542,8 +691,13 @@ function App() {
         className="melia-content t-page-slide"
         data-page={isMovieDetailOpen ? '2' : '1'}
         data-sidebar-follow=""
+        ref={contentRef}
       >
         <div className="melia-page t-page" data-page-id="1" ref={listPaneRef} inert={isMovieDetailOpen}>
+          {/* Page name for screen readers only: on screen, the sidebar or the tabs show it */}
+          <h2 className="sr-only" id={PAGE_HEADING_ID} tabIndex={-1}>
+            {PAGE_TITLES[activeTab]}
+          </h2>
           {!isMovieDetailOpen && statusBanners}
 
           <div style={{ display: activeTab === 'movies' ? 'block' : 'none' }}>
@@ -557,7 +711,7 @@ function App() {
               radarrQueue={moviesManager.radarrQueue}
               findInLibrary={moviesManager.findInLibrary}
               onSelectMovie={openMovieDetail}
-              onOpenAddMovie={moviesManager.openAddMovie}
+              onOpenAddMovie={openAddMovieDetail}
               isConfigLoaded={configManager.configLoaded}
               isConfigured={moviesManager.isConfigured}
               hasLoaded={moviesManager.hasLoaded}
@@ -578,7 +732,7 @@ function App() {
               downloads={downloadsManager.downloads}
               sonarrQueue={seriesManager.sonarrQueue}
               findInLibrary={seriesManager.findInLibrary}
-              onSelectSeries={seriesManager.selectSeries}
+              onSelectSeries={openSeries}
               onOpenAddSeries={seriesManager.openAddSeries}
               isConfigLoaded={configManager.configLoaded}
               isConfigured={seriesManager.isConfigured}
@@ -599,8 +753,8 @@ function App() {
               onPlay={playVideo}
               onDelete={downloadsManager.handleDeleteDownload}
               onCancelServerQueue={handleCancelServerQueueItem}
-              onSelectMovie={openMovieDetail}
-              onSelectSeries={seriesManager.selectSeries}
+              onSelectMovie={openMovieDetailFromDownloads}
+              onSelectSeries={openSeries}
             />
           </div>
 
@@ -635,6 +789,9 @@ function App() {
                 void moviesManager.loadMovies(configManager.editingConfig);
                 void seriesManager.loadSeries(configManager.editingConfig);
               }}
+              radarrError={moviesManager.loadError}
+              sonarrError={seriesManager.loadError}
+              onShowChangelog={changelogManager.openChangelog}
             />
           </div>
         </div>
@@ -646,13 +803,27 @@ function App() {
           inert={!isMovieDetailOpen}
           onTransitionEnd={event => {
             if (event.target !== event.currentTarget || event.propertyName !== 'opacity') return;
-            if (!isMovieDetailOpen) setClosingMovie(null);
+            if (!isMovieDetailOpen) setClosingPage(null);
           }}
         >
+          {detailPage?.kind === 'add' && (
+            <AddMovieView
+              key={detailPageKey(detailPage)}
+              movie={detailPage.movie}
+              qualityProfiles={moviesManager.qualityProfiles}
+              selectedQuality={moviesManager.selectedQuality}
+              setSelectedQuality={moviesManager.setSelectedQuality}
+              isAdding={isMovieDetailOpen && moviesManager.isAddingMovie}
+              error={isMovieDetailOpen ? moviesManager.addMovieError : null}
+              notices={isMovieDetailOpen ? statusBanners : undefined}
+              onAdd={handleAddMovie}
+            />
+          )}
           {detailMovie && (
             <MovieDetailView
-              key={detailMovie.id}
+              key={`movie-${detailMovie.id}`}
               movie={detailMovie}
+              isJustAdded={detailMovie.id === justAddedMovieId}
               download={downloadsManager.downloads[`movie-${detailMovie.id}`]}
               queueItem={moviesManager.radarrQueue[detailMovie.id]}
               movieStatus={moviesManager.getMovieStatus(detailMovie)}
@@ -671,6 +842,12 @@ function App() {
             />
           )}
         </div>
+
+        {/* Trackpad swipe forward: the page about to reopen is signalled on the trailing
+            edge (decorative, the swipe has no keyboard counterpart to announce) */}
+        <div className="melia-swipe-hint" aria-hidden="true">
+          <ChevronRight className="melia-swipe-hint-icon" size={20} />
+        </div>
       </main>
 
       <UpdateBanner
@@ -678,23 +855,6 @@ function App() {
         isInstalling={updater.isInstalling}
         onInstall={updater.handleInstall}
         onDismiss={updater.dismissUpdate}
-      />
-
-      {/* Movies Modals */}
-      <AddMovieModal
-        movie={moviesManager.addingMovie}
-        qualityProfiles={moviesManager.qualityProfiles}
-        selectedQuality={moviesManager.selectedQuality}
-        setSelectedQuality={moviesManager.setSelectedQuality}
-        isAdding={moviesManager.isAddingMovie}
-        error={moviesManager.addMovieError}
-        onAdd={async (autoDownload: boolean) => {
-          const success = await moviesManager.handleAddMovie(autoDownload);
-          if (success) {
-            searchManager.clearSearch();
-          }
-        }}
-        onClose={moviesManager.closeAddMovie}
       />
 
       {/* Series Modals */}
@@ -705,7 +865,7 @@ function App() {
         downloads={downloadsManager.downloads}
         sonarrQueue={seriesManager.sonarrQueue}
         config={configManager.config}
-        onClose={() => seriesManager.selectSeries(null)}
+        onClose={closeSeries}
         onPlayStream={playVideo}
         onPlayLocal={playVideo}
         onDownloadEpisode={(s, ep) =>
@@ -752,6 +912,7 @@ function App() {
         isOpen={changelogManager.isOpen}
         version={changelogManager.version}
         groups={changelogManager.groups}
+        date={changelogManager.date}
         onClose={changelogManager.closeChangelog}
       />
     </div>
