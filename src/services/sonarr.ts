@@ -1,4 +1,12 @@
-import { Episode, EpisodeFile, LookupSeries, QualityProfile, Series, UnifiedQueueItem } from '../types';
+import {
+  Episode,
+  EpisodeFile,
+  LookupSeries,
+  QualityProfile,
+  RootFolder,
+  Series,
+  UnifiedQueueItem,
+} from '../types';
 import { normalizeRootFolder } from '../utils/formatters';
 import { invokeSynced } from './runtime';
 
@@ -30,8 +38,9 @@ export async function fetchSonarrQualityProfiles(): Promise<QualityProfile[]> {
   return JSON.parse(await sonarrRequest('GET', '/api/v3/qualityprofile'));
 }
 
-export async function fetchSonarrRootFolders(): Promise<{ path: string }[]> {
-  return JSON.parse(await sonarrRequest('GET', '/api/v3/rootfolder'));
+export async function fetchSonarrRootFolders(): Promise<RootFolder[]> {
+  const data: unknown = JSON.parse(await sonarrRequest('GET', '/api/v3/rootfolder'));
+  return Array.isArray(data) ? data : [];
 }
 
 export async function fetchSonarrEpisodes(seriesId: number): Promise<Episode[]> {
