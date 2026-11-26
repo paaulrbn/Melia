@@ -2,7 +2,7 @@ import type { MouseEvent } from 'react';
 import { DownloadInfo, LookupMovie, Movie, QueueRecord } from '../../types';
 import { getImageUrl } from '../../utils/media';
 import { Play, Plus } from 'lucide-react';
-import { ProgressBar } from '../ui';
+import { Poster, ProgressBar } from '../ui';
 
 interface MovieCardProps {
   readonly movie: Movie | LookupMovie;
@@ -35,7 +35,7 @@ export function MovieCard({
       data-movie-id={'id' in movie ? movie.id : undefined}
       onClick={onClick}
     >
-      {posterUrl && <img src={posterUrl} alt={movie.title} loading="lazy" />}
+      {posterUrl && <Poster src={posterUrl} alt={movie.title} />}
       <div className="movie-overlay">
         <h3>{movie.title}</h3>
         <span className="year">{movie.year}</span>

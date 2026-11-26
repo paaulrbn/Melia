@@ -1,7 +1,7 @@
 import { LookupSeries, Series, UnifiedQueueItem } from '../../types';
 import { getImageUrl } from '../../utils/media';
 import { Play, Plus } from 'lucide-react';
-import { ProgressBar } from '../ui';
+import { Poster, ProgressBar } from '../ui';
 
 interface SeriesCardProps {
   readonly series: Series | LookupSeries;
@@ -46,7 +46,7 @@ export function SeriesCard({
       className="movie-card"
       onClick={onClick}
     >
-      {posterUrl && <img src={posterUrl} alt={series.title} loading="lazy" />}
+      {posterUrl && <Poster src={posterUrl} alt={series.title} />}
       <div className="movie-overlay">
         <h3>{series.title}</h3>
         <span className="year">

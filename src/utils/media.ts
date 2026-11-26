@@ -1,5 +1,16 @@
 import { Config, MovieImage } from '../types';
 
+/**
+ * TMDB size per cover type: Radarr and Sonarr hand out the original file (often 2000 x 3000 px),
+ * far too heavy to decode for a grid card or a backdrop.
+ */
+const TMDB_SIZES: Record<string, string> = {
+  poster: 'w500',
+  fanart: 'w1280',
+};
+
+const TMDB_SIZE_PATTERN = /^(https?:\/\/image\.tmdb\.org\/t\/p\/)[^/]+\//;
+
 export function getImageUrl(
   movie: { images?: MovieImage[] } | null | undefined,
   type: string
@@ -8,7 +19,10 @@ export function getImageUrl(
   const img = movie.images.find(i => i.coverType === type);
   if (!img?.remoteUrl) return null;
   let url = img.remoteUrl;
-  if (type === 'poster' && url.includes('poster.jpg')) {
+  const tmdbSize = TMDB_SIZES[type];
+  if (tmdbSize && TMDB_SIZE_PATTERN.test(url)) {
+    url = url.replace(TMDB_SIZE_PATTERN, `$1${tmdbSize}/`);
+  } else if (type === 'poster' && url.includes('poster.jpg')) {
     url = url.replace('poster.jpg', 'poster-250.jpg');
   }
   return url || null;

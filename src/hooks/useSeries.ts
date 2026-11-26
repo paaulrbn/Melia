@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Config, DownloadInfo, Episode, LookupSeries, QualityProfile, Series, UnifiedQueueItem } from '../types';
 import { normalizeRootFolder } from '../utils/formatters';
+import { getImageUrl } from '../utils/media';
 import { useAdaptivePolling } from './useAdaptivePolling';
+import { usePreloadImages } from './usePreloadImages';
 import {
   fetchSonarrSeries,
   fetchSonarrSeriesDetail,
@@ -378,6 +380,13 @@ export function useSeries({ config, downloads }: UseSeriesProps) {
       return epFileCount === 0;
     });
   }, [series]);
+
+  // Warm up the grid posters in display order, so they are decoded before they are scrolled to
+  const posterUrls = useMemo(
+    () => [...localSeries, ...serverSeries, ...unavailableSeries].map(s => getImageUrl(s, 'poster')),
+    [localSeries, serverSeries, unavailableSeries]
+  );
+  usePreloadImages(posterUrls);
 
   const selectedSeriesEpisodes = useMemo(() => {
     if (!selectedSeries) return [];
