@@ -1,15 +1,18 @@
-import { useState, type KeyboardEvent } from 'react';
+import { useState } from 'react';
+import { Pause, Play, Trash2, X } from 'lucide-react';
 import { DownloadInfo, Movie, Series } from '../../types';
-import { Film, Play, Pause, Trash2, X } from 'lucide-react';
-import { Button, IconButton, ProgressBar } from '../ui';
+import { Button } from '../ui';
 import { ConfirmModal } from '../common/ConfirmModal';
 import { getImageUrl } from '../../utils/media';
+import { DownloadAction, DownloadRow, DownloadThumb } from './DownloadRow';
+import { describeLocalDownload } from './transferDetails';
 
 interface DownloadItemProps {
   readonly download: DownloadInfo;
   readonly movie?: Movie;
   readonly series?: Series;
-  readonly onSelectMovie?: (movie: Movie) => void;
+  /** `trigger`: the row, which takes the focus back when the movie page closes */
+  readonly onSelectMovie?: (movie: Movie, trigger?: HTMLElement) => void;
   readonly onSelectSeries?: (series: Series) => void;
   readonly onPause: (id: string) => void;
   readonly onResume: (id: string) => void;
@@ -23,120 +26,7 @@ function getMediaPosterUrl(movie?: Movie, series?: Series): string | null {
   return null;
 }
 
-interface ItemActionsProps {
-  readonly isCompleted: boolean;
-  readonly isDownloading: boolean;
-  readonly isPaused: boolean;
-  readonly download: DownloadInfo;
-  readonly onPause: (id: string) => void;
-  readonly onResume: (id: string) => void;
-  readonly onPlay: (path: string, title?: string) => void;
-  readonly onOpenDelete: () => void;
-}
-
-function DownloadItemActions({
-  isCompleted,
-  isDownloading,
-  isPaused,
-  download,
-  onPause,
-  onResume,
-  onPlay,
-  onOpenDelete,
-}: Readonly<ItemActionsProps>) {
-  return (
-    <div
-      className="dl-actions"
-      onClick={(e) => e.stopPropagation()}
-      onKeyDown={(e) => e.stopPropagation()}
-    >
-      {!isCompleted && (
-        <span className="dl-percentage dl-percentage--local">
-          {download.progress}%
-        </span>
-      )}
-
-      {isDownloading && (
-        <IconButton
-          icon={<Pause size={16} fill="currentColor" />}
-          variant="ghost"
-          size="sm"
-          onClick={() => onPause(download.id)}
-          title="Pause"
-          aria-label="Mettre en pause"
-        />
-      )}
-
-      {isPaused && (
-        <IconButton
-          icon={<Play size={16} fill="currentColor" />}
-          variant="ghost"
-          size="sm"
-          onClick={() => onResume(download.id)}
-          title="Reprendre"
-          aria-label="Reprendre le téléchargement"
-        />
-      )}
-
-      {isCompleted && download.path && (
-        <Button
-          variant="primary"
-          size="sm"
-          leftIcon={<Play size={16} fill="currentColor" />}
-          onClick={() => onPlay(download.path!, download.title)}
-        >
-          Lancer
-        </Button>
-      )}
-
-      <IconButton
-        icon={isCompleted ? <Trash2 size={16} /> : <X size={16} />}
-        variant="danger"
-        size="sm"
-        onClick={onOpenDelete}
-        title={isCompleted ? 'Supprimer' : 'Annuler'}
-        aria-label={isCompleted ? 'Supprimer le téléchargement' : 'Annuler le téléchargement'}
-      />
-    </div>
-  );
-}
-
-function DownloadItemMeta({
-  isCompleted,
-  isDownloading,
-  isPaused,
-  download,
-}: Readonly<{
-  isCompleted: boolean;
-  isDownloading: boolean;
-  isPaused: boolean;
-  download: DownloadInfo;
-}>) {
-  if (isCompleted) {
-    return (
-      <div className="dl-meta-row">
-        <span className="dl-stats dl-stats--completed">
-          <span>{download.stats || 'Sur le disque'}</span>
-        </span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="dl-meta-row">
-      <span className="dl-stats">
-        <span>{download.sizeStr || download.stats}</span>
-        {isDownloading && download.speed && <span className="dl-separator">•</span>}
-        {isDownloading && download.speed && <span>{download.speed}</span>}
-        {isDownloading && download.timeRemaining && <span className="dl-separator">•</span>}
-        {isDownloading && download.timeRemaining && <span>Reste {download.timeRemaining}</span>}
-        {isPaused && <span className="dl-separator">•</span>}
-        {isPaused && <span className="dl-paused-label">En pause</span>}
-      </span>
-    </div>
-  );
-}
-
+/** A movie (or a lone episode) on this computer: in progress, paused, interrupted or ready. */
 export function DownloadItem({
   download,
   movie,
@@ -152,92 +42,75 @@ export function DownloadItem({
 
   const isCompleted = download.status === 'completed';
   const isDownloading = download.status === 'downloading';
-  const isPaused = download.status === 'paused';
+  const canResume = download.status === 'paused' || download.status === 'error';
+  const view = describeLocalDownload(download);
 
-  const isClickable = !!((movie && onSelectMovie) || (series && onSelectSeries));
-  const posterUrl = getMediaPosterUrl(movie, series);
-
-  const triggerSelect = () => {
-    if (movie && onSelectMovie) {
-      onSelectMovie(movie);
-    } else if (series && onSelectSeries) {
-      onSelectSeries(series);
-    }
-  };
-
+  const title = download.subTitle ? `${download.title}, ${download.subTitle}` : download.title;
   const displaySubTitle = download.subTitle ? ` (${download.subTitle})` : '';
 
-  const poster = posterUrl ? (
-    <img src={posterUrl} alt="" className="dl-poster" />
+  let onOpen: ((trigger: HTMLElement) => void) | undefined;
+  if (movie && onSelectMovie) onOpen = trigger => onSelectMovie(movie, trigger);
+  else if (series && onSelectSeries) onOpen = () => onSelectSeries(series);
+
+  const actions = isCompleted ? (
+    <>
+      {download.path && (
+        <Button
+          variant="primary"
+          size="sm"
+          leftIcon={<Play size={14} fill="currentColor" aria-hidden="true" />}
+          onClick={() => onPlay(download.path!, download.title)}
+          aria-label={`Lancer ${title}`}
+        >
+          Lancer
+        </Button>
+      )}
+      <DownloadAction
+        label="Supprimer de cet ordinateur"
+        icon={<Trash2 size={16} aria-hidden="true" />}
+        onClick={() => setShowDeleteConfirm(true)}
+        destructive
+      />
+    </>
   ) : (
-    <div className="dl-poster dl-poster--placeholder">
-      <Film size={18} />
-    </div>
+    <>
+      {isDownloading && (
+        <DownloadAction
+          label="Mettre en pause"
+          icon={<Pause size={16} aria-hidden="true" />}
+          onClick={() => onPause(download.id)}
+        />
+      )}
+      {canResume && (
+        <DownloadAction
+          label="Reprendre le téléchargement"
+          icon={<Play size={16} aria-hidden="true" />}
+          onClick={() => onResume(download.id)}
+        />
+      )}
+      <DownloadAction
+        label="Annuler le téléchargement"
+        icon={<X size={16} aria-hidden="true" />}
+        onClick={() => setShowDeleteConfirm(true)}
+        destructive
+      />
+    </>
   );
-
-  const title = (
-    <h4 title={download.title}>
-      {download.title}
-      {download.subTitle && <span className="dl-subtitle"> — {download.subTitle}</span>}
-    </h4>
-  );
-
-  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.target !== e.currentTarget) return;
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      triggerSelect();
-    }
-  };
 
   return (
     <>
-      <div
-        className={`download-item ${isClickable ? 'is-clickable' : ''}`.trim()}
-        {...(isClickable && {
-          role: 'button',
-          tabIndex: 0,
-          onClick: triggerSelect,
-          onKeyDown: handleKeyDown,
-          title: 'Cliquer pour voir les détails',
-        })}
-      >
-        {poster}
-
-        <div className="dl-main">
-          <div className="dl-header-row">
-            {title}
-
-            <DownloadItemActions
-              isCompleted={isCompleted}
-              isDownloading={isDownloading}
-              isPaused={isPaused}
-              download={download}
-              onPause={onPause}
-              onResume={onResume}
-              onPlay={onPlay}
-              onOpenDelete={() => setShowDeleteConfirm(true)}
-            />
-          </div>
-
-          {!isCompleted && (
-            <div className="dl-progress-row">
-              <ProgressBar
-                value={download.progress}
-                isPaused={isPaused}
-                size="md"
-              />
-            </div>
-          )}
-
-          <DownloadItemMeta
-            isCompleted={isCompleted}
-            isDownloading={isDownloading}
-            isPaused={isPaused}
-            download={download}
-          />
-        </div>
-      </div>
+      <DownloadRow
+        title={title}
+        status={view.status}
+        details={view.figures}
+        progress={view.progress}
+        state={view.state}
+        leading={<DownloadThumb src={getMediaPosterUrl(movie, series)} kind={series && !movie ? 'series' : 'movie'} />}
+        actions={actions}
+        onOpen={onOpen}
+        openLabel={movie ? 'Voir la fiche du film' : 'Voir la fiche de la série'}
+        movieId={onOpen ? movie?.id : undefined}
+      />
 
       <ConfirmModal
         isOpen={showDeleteConfirm}

@@ -1,346 +1,410 @@
 /* ==========================================================================
-   Downloads View & Active Progress
+   Downloads page
+   Two sections ("Sur cet ordinateur", "Sur le serveur"), each one grouped list on a
+   card: a row per movie, a disclosure row per series with its episodes under it.
+   White and grey only, like the download block of the movie page: the thin bar is the
+   one moving element, red is kept for an interruption and destructive hovers.
    ========================================================================== */
 
 .downloads-view {
+  /* Row geometry: the separators and the episodes start where the titles start */
+  --dl-list-pad: 4px;
+  --dl-row-pad-block: 10px;
+  --dl-row-pad-inline: 12px;
+  --dl-row-radius: calc(var(--radius-lg) - var(--dl-list-pad)); /* concentric: 10px */
+  --dl-thumb-width: 40px;
+  --dl-thumb-gap: var(--space-sm);
+  --dl-text-start: calc(var(--dl-row-pad-inline) + var(--dl-thumb-width) + var(--dl-thumb-gap));
+  --dl-action-size: 32px;
+  /* Motion (transitions.dev scale) */
+  --dl-row-enter: 250ms;
+  --dl-row-exit: var(--duration-quick); /* 150ms. Same as EXIT_MS in PresenceList.tsx */
+  --dl-acc-dur: 250ms;
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
   max-width: var(--view-narrow-width);
   margin: 0 auto;
 }
 
+/* --------------------------------------------------------------------------
+   Sections
+   -------------------------------------------------------------------------- */
 .downloads-section {
-  margin-bottom: var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  min-width: 0;
 }
 
+/* Same heading as the library sections: name in grey, count dimmer */
 .downloads-section-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+  margin: 0;
   color: var(--text-secondary);
   font-family: var(--font-heading), sans-serif;
-  font-size: var(--text-md);
-  font-weight: 500;
-  letter-spacing: -0.2px;
-  margin: 0 0 var(--space-md) 0;
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-}
-
-.downloads-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-}
-
-.download-item {
-  background: rgba(255, 255, 255, 0.02);
-  padding: 6px;
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  transition: var(--transition-smooth);
-}
-
-.download-item.is-clickable {
-  cursor: pointer;
-}
-
-.download-item.is-clickable:hover {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.08);
-}
-
-.dl-poster {
-  width: auto;
-  height: 80px;
-  border-radius: 8px;
-  object-fit: cover;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  flex-shrink: 0;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
-  background: rgba(0, 0, 0, 0.2);
-}
-
-.dl-poster--placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--text-tertiary);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.dl-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  justify-content: center;
-}
-
-.dl-header-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-md);
-  min-width: 0;
-}
-
-.dl-header-row h4 {
-  margin: 0;
-  font-family: var(--font-body), sans-serif;
-  font-size: var(--text-base);
+  font-size: var(--text-lg);
   font-weight: 600;
-  color: var(--text-primary);
-  letter-spacing: -0.2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-  flex: 1;
-}
-
-.dl-subtitle {
-  color: var(--text-secondary);
-  font-weight: 400;
-}
-
-.dl-progress-row {
-  width: 100%;
-}
-
-.dl-meta-row {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-}
-
-.dl-stats {
-  font-size: var(--text-xs);
-  color: var(--text-tertiary);
-  font-variant-numeric: tabular-nums;
-  font-weight: 400;
-  display: flex;
-  align-items: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.dl-stats--completed {
-  color: var(--text-tertiary);
-  font-size: var(--text-xs);
-  font-weight: 400;
-}
-
-.dl-stats span {
-  white-space: nowrap;
-}
-
-.dl-separator {
-  margin: 0 var(--space-xs);
-  color: var(--text-tertiary);
-  opacity: 0.6;
-  font-size: 0.85em;
-  display: inline-block;
-}
-
-.dl-paused-label {
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-.dl-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  flex-shrink: 0;
-}
-
-.dl-percentage {
-  font-size: var(--text-sm);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  min-width: 38px;
-  text-align: right;
-  margin-right: 2px;
-}
-
-.dl-percentage--server {
-  color: var(--status-server);
-}
-
-.dl-percentage--local {
-  color: var(--accent-primary);
-}
-
-/* ==========================================================================
-   Series Group in Downloads
-   ========================================================================== */
-.download-series-group {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  border-radius: 14px;
-  overflow: hidden;
-  transition: var(--transition-smooth);
-}
-
-.download-series-group:hover {
-  border-color: rgba(255, 255, 255, 0.07);
-}
-
-.download-series-group-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 18px;
-  background: rgba(255, 255, 255, 0.02);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  transition: var(--transition-smooth);
-}
-
-button.download-series-group-header {
-  width: 100%;
-  border-top: none;
-  border-left: none;
-  border-right: none;
-  text-align: left;
-  font: inherit;
-  color: inherit;
-}
-
-.download-series-group-header.is-clickable:hover {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.download-series-group-info {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-}
-
-.download-series-group-poster {
-  width: 28px;
-  height: 40px;
-  border-radius: 5px;
-  object-fit: cover;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
-}
-
-.download-series-group-icon {
-  color: var(--accent-primary);
-  opacity: 0.8;
-  flex-shrink: 0;
-}
-
-.download-series-group-title {
-  margin: 0;
-  font-family: var(--font-body), sans-serif;
-  font-size: var(--text-base);
-  font-weight: 600;
-  color: var(--text-primary);
-  letter-spacing: -0.2px;
-}
-
-.download-series-group-count {
-  font-size: var(--text-xs);
-  color: var(--text-tertiary);
-  background: rgba(255, 255, 255, 0.05);
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-weight: 500;
-}
-
-.download-series-episodes {
-  display: flex;
-  flex-direction: column;
-}
-
-.download-series-ep-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  padding: 12px 18px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.025);
-}
-
-.download-series-ep-row:last-child {
-  border-bottom: none;
-}
-
-.dl-ep-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  justify-content: center;
-}
-
-.dl-ep-header-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-md);
-  min-width: 0;
-}
-
-.dl-ep-title-group {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  flex: 1;
-}
-
-.dl-ep-title {
-  font-size: var(--text-base);
-  font-weight: 600;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   letter-spacing: -0.2px;
   line-height: 1.25;
 }
 
-.dl-ep-sub {
-  font-size: 0.8rem;
+.downloads-section-count {
+  color: var(--text-tertiary);
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.8);
+  letter-spacing: 0;
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+}
+
+.downloads-section-empty {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+/* Nothing anywhere: one strong line, one explanation */
+.downloads-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-micro);
+  margin: calc(2 * var(--space-2xl)) auto 0;
+  max-width: 28rem;
+  text-align: center;
+}
+
+.downloads-empty-title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--text-base);
+  font-weight: 600;
+  line-height: 1.375;
+}
+
+.downloads-empty-detail {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  text-wrap: balance;
+}
+
+/* --------------------------------------------------------------------------
+   Lists and rows
+   -------------------------------------------------------------------------- */
+.dl-list,
+.dl-episodes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dl-list {
+  padding: var(--dl-list-pad);
+  border-radius: var(--radius-lg);
+  background-color: var(--surface-1);
+}
+
+/* A slot holds one row; it grows in and folds away through its height */
+.dl-slot {
+  position: relative;
+  display: grid;
+  grid-template-rows: 1fr;
+}
+
+.dl-slot-inner {
+  min-height: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.2;
 }
 
-.dl-ep-progress-row {
-  width: 100%;
+/* Hairline between rows, from the titles' edge to the row's end */
+.dl-list > .dl-slot + .dl-slot::before,
+.dl-episodes > .dl-slot::before {
+  content: '';
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: var(--dl-text-start) var(--dl-row-pad-inline);
+  height: 1px;
+  background-color: var(--border-subtle);
+  pointer-events: none;
 }
 
-.dl-ep-meta-row {
+.dl-row {
+  position: relative;
   display: flex;
   align-items: center;
+  gap: var(--dl-thumb-gap);
+  min-width: 0;
+  padding: var(--dl-row-pad-block) var(--dl-row-pad-inline);
+  border-radius: var(--dl-row-radius);
+  transition: background-color var(--duration-quick) var(--ease-out);
+}
+
+/* Episodes: no poster, their text on the series title's edge */
+.dl-row--episode {
+  padding-inline-start: var(--dl-text-start);
+}
+
+/* The whole row is the target; not while the pointer is on one of its buttons */
+.dl-row.is-clickable:hover:not(:has(.dl-row-actions > :hover)) {
+  background-color: var(--surface-2);
+  transition-duration: var(--duration-micro);
+}
+
+/* Poster: 2:3, the icon waits behind it, hairline edge over the image */
+.dl-thumb {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--dl-thumb-width);
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  border-radius: 6px;
+  background-color: var(--surface-2);
+}
+
+.dl-thumb::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.1);
+  pointer-events: none;
+}
+
+.dl-thumb-icon {
+  color: var(--icon-tertiary);
+}
+
+.dl-thumb-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dl-row-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   min-width: 0;
 }
 
-.dl-ep-stats {
-  font-size: var(--text-xs);
-  color: var(--text-tertiary);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: flex;
-  align-items: center;
+.dl-row-title {
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-primary);
+  font-family: var(--font-body), sans-serif;
+  font-size: var(--text-base);
+  font-weight: 600;
+  line-height: 1.375;
+  text-align: start;
 }
 
-.dl-ep-actions {
+/* Episodes sit under their series: regular weight */
+.dl-row--episode .dl-row-title {
+  font-weight: 400;
+}
+
+.dl-row-title-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Title button stretched over the row: the row is one target, the actions sit above */
+.dl-row-hit {
+  cursor: pointer;
+}
+
+.dl-row-hit::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--dl-row-radius);
+}
+
+.dl-row-hit:focus-visible {
+  outline: none;
+}
+
+/* Keyboard focus on the title: the ring goes round the whole row, inside the card */
+.dl-row:has(> .dl-row-text > .dl-row-hit:focus-visible) {
+  outline: var(--focus-ring);
+  outline-offset: -3px;
+}
+
+/* Figures spaced apart, no separator; tabular digits so they do not jiggle each second */
+.dl-row-detail {
   display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-md);
+  margin: 2px 0 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+
+.dl-row-detail > span {
+  white-space: nowrap;
+}
+
+.dl-row[data-state='error'] .dl-row-status {
+  color: var(--danger);
+}
+
+.dl-row-bar {
+  margin-top: var(--space-xs);
+}
+
+/* Actions above the stretched title; the gaps between them let clicks through to it */
+.dl-row-actions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: none;
   align-items: center;
   gap: var(--space-xs);
-  flex-shrink: 0;
+  pointer-events: none;
+}
+
+.dl-row-actions > * {
+  pointer-events: auto;
+}
+
+/* Round glass buttons, the family of the movie page's pause and cancel */
+.dl-action {
+  display: inline-grid;
+  place-items: center;
+  width: var(--dl-action-size);
+  height: var(--dl-action-size);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background-color: var(--glass-fill);
+  box-shadow: inset 0 0 0 0.5px var(--glass-edge), var(--glass-highlight);
+  color: var(--icon-secondary);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out),
+    scale var(--duration-quick) var(--ease-out);
+}
+
+.dl-action:hover {
+  background-color: var(--glass-fill-active);
+  color: var(--icon-primary);
+  transition-duration: var(--duration-micro);
+}
+
+.dl-action--destructive:hover {
+  background-color: rgb(255 77 79 / 0.16);
+  color: var(--danger);
+}
+
+.dl-action:active {
+  scale: 0.96;
+}
+
+.dl-action:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.dl-row-actions .ui-btn:active:not(:disabled) {
+  scale: 0.96;
+}
+
+/* --------------------------------------------------------------------------
+   Series group: disclosure row, episodes in a panel that grows and folds
+   (transitions.dev accordion: grid rows 0fr to 1fr, chevron flipped with scaleY)
+   -------------------------------------------------------------------------- */
+/* Round glass button (.dl-action, 32px) that alone shows or hides the episodes */
+.dl-group-chevron {
+  transform: scaleY(1);
+  transition: transform var(--dl-acc-dur) var(--ease-smooth-out);
+}
+
+.dl-group-chevron path {
+  vector-effect: non-scaling-stroke;
+}
+
+.dl-group[data-open='true'] .dl-group-chevron {
+  transform: scaleY(-1);
+}
+
+.dl-group-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--dl-acc-dur) var(--ease-smooth-out);
+}
+
+.dl-group[data-open='true'] .dl-group-panel {
+  grid-template-rows: 1fr;
+}
+
+.dl-group-panel-inner {
+  min-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  filter: blur(var(--blur-small, 2px));
+  transition:
+    opacity var(--dl-acc-dur) var(--ease-smooth-out),
+    filter var(--dl-acc-dur) var(--ease-smooth-out);
+}
+
+.dl-group[data-open='true'] .dl-group-panel-inner {
+  opacity: 1;
+  filter: blur(0);
+}
+
+/* --------------------------------------------------------------------------
+   Rows coming and going (not on page load: see PresenceList)
+   -------------------------------------------------------------------------- */
+.dl-slot[data-enter]:not([data-presence]) {
+  animation: dl-slot-enter var(--dl-row-enter) var(--ease-smooth-out) both;
+}
+
+@keyframes dl-slot-enter {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  to {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+}
+
+/* Leaving: softer and quicker than the entrance */
+.dl-slot[data-presence='leaving'] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows var(--dl-row-exit) var(--ease-smooth-out),
+    opacity var(--dl-row-exit) var(--ease-smooth-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dl-slot[data-enter]:not([data-presence]) {
+    animation: none;
+  }
+
+  .dl-slot[data-presence='leaving'],
+  .dl-group-panel,
+  .dl-group-panel-inner,
+  .dl-group-chevron {
+    transition: none;
+  }
 }
