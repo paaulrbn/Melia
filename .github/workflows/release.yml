@@ -14,7 +14,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: macos-latest
+          # Xcode 27 (macOS 27 SDK) gives the Liquid Glass window buttons; the image is a
+          # GitHub preview until a GA macos-27 label exists
+          - platform: xcode-27
             args: '--target universal-apple-darwin'
           - platform: windows-latest
             args: ''
@@ -24,6 +26,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Select Xcode 27
+        if: runner.os == 'macOS'
+        run: |
+          sudo xcode-select -s /Applications/Xcode_27.2.app
+          xcodebuild -version
+          sdk="$(xcrun --sdk macosx --show-sdk-version)"
+          echo "macOS SDK $sdk"
+          # An older SDK would ship the old flat window buttons: stop here
+          [ "${sdk%%.*}" -ge 27 ] || { echo "macOS SDK 27 or later required"; exit 1; }
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -32,7 +44,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ runner.os == 'macOS' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
