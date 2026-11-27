@@ -15,10 +15,10 @@ export function seasonTabId(idPrefix: string, season: number): string {
 }
 
 /**
- * Season picker: a segmented control whose pill slides to the chosen season (transitions.dev
- * tabs sliding). The pill is measured from the tab, written without a transition at first
- * paint and on resize, and with one when the choice changes. Arrow keys, Home and End move
- * between seasons; only the active tab is a tab stop. A long list scrolls sideways.
+ * Season picker: a segmented control whose pill slides to the chosen season. The pill
+ * is measured from the tab, written without a transition at first paint and on resize, and
+ * with one when the choice changes. Arrow keys, Home and End move between seasons; only the
+ * active tab is a tab stop. A long list scrolls sideways.
  */
 export function SeasonTabs({ seasons, value, onChange, idPrefix, panelId }: Readonly<SeasonTabsProps>) {
   const scrollerRef = useRef<HTMLDivElement>(null);

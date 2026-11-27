@@ -99,7 +99,7 @@
   box-sizing: border-box;
 }
 
-/* Hairline between rows, inset from the leading edge like the system lists */
+/* Hairline between rows, inset from the leading edge */
 .settings-row + .settings-row::before {
   content: '';
   position: absolute;

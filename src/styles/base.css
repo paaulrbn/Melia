@@ -29,7 +29,7 @@ body {
   background: transparent;
 }
 
-/* Reading text stays selectable and copyable, like a description in a native app.
+/* Reading text stays selectable and copyable.
    Episode summaries sit in clickable rows: they keep the row's behaviour. */
 :where(
   .overview,

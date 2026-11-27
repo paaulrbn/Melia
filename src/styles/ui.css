@@ -2,7 +2,7 @@
    UI Primitives & Design System Components
    ========================================================================== */
 
-/* Button (.ui-btn): macOS 26 push buttons are capsules; secondary ones are light glass */
+/* Button (.ui-btn): capsules; secondary ones are light glass */
 .ui-btn {
   display: inline-flex;
   align-items: center;

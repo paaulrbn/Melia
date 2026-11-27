@@ -1,7 +1,7 @@
 /* ==========================================================================
    Changelog sheet ("Nouveautés de Melia")
-   macOS 26 sheet: fixed header and footer, scrolling body, scale + fade
-   (transitions.dev modal: 250ms in, 150ms out, scale 0.96).
+   Sheet with a fixed header and footer and a scrolling body; it opens with a scale + fade
+   (250ms in, 150ms out, scale 0.96).
    ========================================================================== */
 
 .changelog-backdrop {

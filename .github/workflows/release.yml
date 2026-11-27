@@ -14,7 +14,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Xcode 27 (macOS 27 SDK) gives the Liquid Glass window buttons; the image is a
+          # Xcode 27 (macOS 27 SDK) gives the new window buttons; the image is a
           # GitHub preview until a GA macos-27 label exists
           - platform: xcode-27
             args: '--target universal-apple-darwin'

@@ -3,7 +3,7 @@ import { TabType } from '../../types';
 import { PAGE_ORDER, PAGE_TITLES } from './navigation';
 
 interface TopTabsProps {
-  /** Sidebar hidden: the tabs take its place in the top row (iPad style). */
+  /** Sidebar hidden: the tabs take its place in the top row. */
   readonly isShown: boolean;
   readonly activeTab: TabType;
   readonly onSelectTab: (tab: TabType) => void;
@@ -16,8 +16,7 @@ interface TopTabsProps {
  * Main pages as a floating glass capsule in the top row, shown while the sidebar is hidden.
  * Same destinations and active page as the sidebar (its movie groups stay there). Kept
  * mounted so it can fade out; hidden, it is inert, so out of the tab order and of the
- * accessibility tree. The active page is marked by a pill that slides between tabs
- * (transitions.dev tabs sliding).
+ * accessibility tree. The active page is marked by a pill that slides between tabs.
  */
 export function TopTabs({
   isShown,

@@ -18,7 +18,7 @@
   --dl-thumb-gap: var(--space-sm);
   --dl-text-start: calc(var(--dl-row-pad-inline) + var(--dl-thumb-width) + var(--dl-thumb-gap));
   --dl-action-size: 32px;
-  /* Motion (transitions.dev scale) */
+  /* Motion */
   --dl-row-enter: 250ms;
   --dl-row-exit: var(--duration-quick); /* 150ms. Same as EXIT_MS in PresenceList.tsx */
   --dl-acc-dur: 250ms;
@@ -387,7 +387,7 @@
 
 /* --------------------------------------------------------------------------
    Series group: disclosure row, episodes in a panel that grows and folds
-   (transitions.dev accordion: grid rows 0fr to 1fr, chevron flipped with scaleY)
+   (grid rows 0fr to 1fr, chevron flipped with scaleY)
    -------------------------------------------------------------------------- */
 /* Round glass button (.dl-action, 32px) that alone shows or hides the episodes */
 .dl-group-chevron {
