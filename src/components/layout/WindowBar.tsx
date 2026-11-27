@@ -13,11 +13,7 @@ interface WindowBarProps {
  * It never moves, whether the sidebar is docked or hidden;
  * the page toolbar (title, search) follows it in the same row.
  */
-export function WindowBar({
-  isSidebarCollapsed,
-  sidebarId,
-  onToggleSidebar,
-}: Readonly<WindowBarProps>) {
+export function WindowBar({ isSidebarCollapsed, sidebarId, onToggleSidebar }: Readonly<WindowBarProps>) {
   const label = isSidebarCollapsed ? 'Afficher la barre latérale' : 'Masquer la barre latérale';
   // Written the way each system writes it: ⌘B on macOS, Ctrl+B elsewhere
   const shortcut = IS_MAC ? '⌘B' : 'Ctrl+B';

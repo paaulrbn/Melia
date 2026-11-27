@@ -1,5 +1,4 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
-import { ChevronRight } from 'lucide-react';
 import { DownloadInfo, Episode, LookupMovie, LookupSeries, Movie, Series, TabType, UnifiedQueueItem } from './types';
 import { useConfig } from './hooks/useConfig';
 import { useDownloads } from './hooks/useDownloads';
@@ -334,9 +333,10 @@ function App() {
   if (openPage && detailPageSubject(openPage) !== (closingPage && detailPageSubject(closingPage))) {
     setClosingPage(openPage);
   }
-  const detailPage = openPage ?? closingPage;
-  const detailMovie = detailPage?.kind === 'movie' ? detailPage.movie : null;
-  const detailSeries = detailPage?.kind === 'series' ? detailPage.series : null;
+  // Page a swipe forward is dragging in: rendered off screen before it is opened
+  const [previewPage, setPreviewPage] = useState<DetailPage | null>(null);
+  const isPreview = openPage === null && previewPage !== null;
+  const detailPage = openPage ?? previewPage ?? closingPage;
   const openPageKey = openPage ? detailPageKey(openPage) : null;
   // Movie added from the search a moment ago: its page says the server search has started
   const [justAddedMovieId, setJustAddedMovieId] = useState<number | null>(null);
@@ -456,53 +456,71 @@ function App() {
   // reappear over the movies, and the other way round
   const movies = moviesManager.movies;
   const seriesList = seriesManager.series;
-  const goForward = useCallback(() => {
+  // The page "forward" would open now, or null when there is none. Added in the meantime:
+  // its library page instead. Removed from the library in the meantime: nothing to reopen.
+  const resolveForward = useCallback((): ForwardEntry | null => {
     const entry = forwardPageRef.current;
-    if (!entry || activeTab !== entry.from || isDetailOpen) return;
+    if (!entry || activeTab !== entry.from || isDetailOpen) return null;
     const { page, from } = entry;
-    // Added in the meantime: its library page instead. Removed from the library in the
-    // meantime: nothing to reopen.
     switch (page.kind) {
       case 'add': {
         const added = movies.find(m => m.tmdbId === page.movie.tmdbId);
-        if (added) openMovieDetail(added, undefined, from);
-        else openAddMovieDetail(page.movie);
-        return;
+        return added ? { page: { kind: 'movie', movie: added }, from } : entry;
       }
       case 'movie': {
         const current = movies.find(m => m.id === page.movie.id);
-        if (current) openMovieDetail(current, undefined, from);
-        else forwardPageRef.current = null;
-        return;
+        return current ? { page: { kind: 'movie', movie: current }, from } : null;
       }
       case 'add-series': {
         const added = seriesList.find(s => s.tvdbId === page.series.tvdbId);
-        if (added) openSeriesDetail(added, undefined, from);
-        else openAddSeriesDetail(page.series);
-        return;
+        return added ? { page: { kind: 'series', series: added }, from } : entry;
       }
       case 'series': {
         const current = seriesList.find(s => s.id === page.series.id);
-        if (current) openSeriesDetail(current, undefined, from);
-        else forwardPageRef.current = null;
-        return;
+        return current ? { page: { kind: 'series', series: current }, from } : null;
       }
+    }
+  }, [activeTab, isDetailOpen, movies, seriesList]);
+
+  const goForward = useCallback(() => {
+    setPreviewPage(null);
+    const target = resolveForward();
+    if (!target) {
+      const entry = forwardPageRef.current;
+      if (entry && activeTab === entry.from && !isDetailOpen) forwardPageRef.current = null;
+      return;
+    }
+    const { page, from } = target;
+    switch (page.kind) {
+      case 'movie':
+        openMovieDetail(page.movie, undefined, from);
+        return;
+      case 'add':
+        openAddMovieDetail(page.movie);
+        return;
+      case 'series':
+        openSeriesDetail(page.series, undefined, from);
+        return;
+      case 'add-series':
+        openAddSeriesDetail(page.series);
+        return;
     }
   }, [
     activeTab,
     isDetailOpen,
-    movies,
-    seriesList,
+    resolveForward,
     openMovieDetail,
     openAddMovieDetail,
     openSeriesDetail,
     openAddSeriesDetail,
   ]);
 
-  const canGoForward = useCallback(() => {
-    const entry = forwardPageRef.current;
-    return entry !== null && activeTab === entry.from && !isDetailOpen;
-  }, [activeTab, isDetailOpen]);
+  const canGoForward = useCallback(() => resolveForward() !== null, [resolveForward]);
+
+  const showForwardPreview = useCallback(
+    (isShown: boolean) => setPreviewPage(isShown ? (resolveForward()?.page ?? null) : null),
+    [resolveForward]
+  );
 
   const appRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLElement>(null);
@@ -512,7 +530,10 @@ function App() {
       // Trackpad swipe: the page already slid out under the fingers, no fade-out left
       if (source === 'swipe') setClosingPage(null);
     },
+    // Trackpad swipe: the page is already fully in place, the swipe styles are dropped in
+    // the same frame without any transition
     onForward: goForward,
+    onForwardPreview: showForwardPreview,
     canGoBack: isDetailOpen,
     canGoForward,
     feedbackRef: appRef,
@@ -771,6 +792,95 @@ function App() {
   // it names the current page, which is the one the detail page goes back to
   const backLabel = DETAIL_BACK_LABELS[activeTab];
 
+  // The detail page content. `preview`: dragged in by a swipe forward, not open yet (the
+  // same page as the one that opens, without the live add state).
+  const renderDetailPage = (page: DetailPage, preview: boolean) => {
+    const notices = isDetailOpen || preview ? statusBanners : undefined;
+    switch (page.kind) {
+      case 'add':
+        return (
+          <AddMovieView
+            key={detailPageKey(page)}
+            movie={page.movie}
+            qualityProfiles={moviesManager.qualityProfiles}
+            selectedQuality={moviesManager.selectedQuality}
+            setSelectedQuality={moviesManager.setSelectedQuality}
+            isAdding={isDetailOpen && moviesManager.isAddingMovie}
+            error={isDetailOpen ? moviesManager.addMovieError : null}
+            notices={notices}
+            onAdd={handleAddMovie}
+          />
+        );
+      case 'add-series':
+        return (
+          <AddSeriesView
+            key={detailPageKey(page)}
+            series={page.series}
+            qualityProfiles={seriesManager.qualityProfiles}
+            selectedQuality={seriesManager.selectedQuality}
+            setSelectedQuality={seriesManager.setSelectedQuality}
+            isAdding={isDetailOpen && seriesManager.isAddingSeries}
+            error={isDetailOpen ? seriesManager.addSeriesError : null}
+            notices={notices}
+            onAdd={handleAddSeries}
+          />
+        );
+      case 'movie': {
+        const { movie } = page;
+        return (
+          <MovieDetailView
+            key={detailPageKey(page)}
+            movie={movie}
+            isJustAdded={!preview &&movie.id === justAddedMovieId}
+            download={downloadsManager.downloads[`movie-${movie.id}`]}
+            queueItem={moviesManager.radarrQueue[movie.id]}
+            movieStatus={moviesManager.getMovieStatus(movie)}
+            config={configManager.config}
+            notices={notices}
+            // After a deletion: back to the list, nothing to reopen
+            onBack={() => closeDetail(true)}
+            onDownload={m => downloadsManager.handleDownloadMovie(m, configManager.config)}
+            onCancelDownload={downloadsManager.handleCancelDownload}
+            onPlay={playVideo}
+            onDeleteDownload={downloadsManager.handleDeleteDownload}
+            onDeleteServerMovie={moviesManager.handleDeleteServerMovie}
+            onCancelServerQueue={moviesManager.handleCancelQueueItem}
+            qualityProfiles={moviesManager.qualityProfiles}
+            onChangeQuality={moviesManager.handleChangeMovieQuality}
+          />
+        );
+      }
+      case 'series': {
+        const { series } = page;
+        return (
+          <SeriesDetailView
+            key={detailPageKey(page)}
+            series={series}
+            episodes={seriesManager.episodesCache[series.id] ?? []}
+            isLoadingEpisodes={seriesManager.isLoadingEpisodes}
+            downloads={downloadsManager.downloads}
+            sonarrQueue={seriesManager.sonarrQueue}
+            config={configManager.config}
+            notices={notices}
+            // After a deletion: back to the list, nothing to reopen
+            onBack={() => closeDetail(true)}
+            onPlay={playVideo}
+            onDownloadEpisode={(s, ep) =>
+              downloadsManager.handleDownloadEpisode(s, ep, configManager.config)
+            }
+            onCancelDownload={downloadsManager.handleCancelDownload}
+            onDeleteDownload={downloadsManager.handleDeleteDownload}
+            onDeleteSeries={seriesManager.handleDeleteSeries}
+            onDeleteEpisodeFile={seriesManager.handleDeleteEpisodeFile}
+            onCancelServerQueue={handleCancelServerQueueItem}
+            onSearchEpisode={seriesManager.handleSearchEpisode}
+            onSearchSeason={seriesManager.handleSearchSeason}
+          />
+        );
+      }
+    }
+  };
+
   const appClassName = `melia-app${sidebar.isCollapsed ? ' is-sidebar-collapsed' : ''}`;
 
   return (
@@ -832,7 +942,6 @@ function App() {
       <main
         className="melia-content t-page-slide"
         data-page={isDetailOpen ? '2' : '1'}
-        data-sidebar-follow=""
         ref={contentRef}
       >
         <div className="melia-page t-page" data-page-id="1" ref={listPaneRef} inert={isDetailOpen}>
@@ -873,6 +982,7 @@ function App() {
               sonarrQueue={seriesManager.sonarrQueue}
               findInLibrary={seriesManager.findInLibrary}
               onSelectSeries={openSeriesDetail}
+              onPrepareSeries={seriesManager.prefetchSeriesEpisodes}
               onOpenAddSeries={openAddSeriesDetail}
               isConfigLoaded={configManager.configLoaded}
               isConfigured={seriesManager.isConfigured}
@@ -941,90 +1051,13 @@ function App() {
           data-page-id="2"
           ref={detailPaneRef}
           inert={!isDetailOpen}
+          aria-hidden={isPreview || undefined}
           onTransitionEnd={event => {
             if (event.target !== event.currentTarget || event.propertyName !== 'opacity') return;
             if (!isDetailOpen) setClosingPage(null);
           }}
         >
-          {detailPage?.kind === 'add' && (
-            <AddMovieView
-              key={detailPageKey(detailPage)}
-              movie={detailPage.movie}
-              qualityProfiles={moviesManager.qualityProfiles}
-              selectedQuality={moviesManager.selectedQuality}
-              setSelectedQuality={moviesManager.setSelectedQuality}
-              isAdding={isDetailOpen && moviesManager.isAddingMovie}
-              error={isDetailOpen ? moviesManager.addMovieError : null}
-              notices={isDetailOpen ? statusBanners : undefined}
-              onAdd={handleAddMovie}
-            />
-          )}
-          {detailPage?.kind === 'add-series' && (
-            <AddSeriesView
-              key={detailPageKey(detailPage)}
-              series={detailPage.series}
-              qualityProfiles={seriesManager.qualityProfiles}
-              selectedQuality={seriesManager.selectedQuality}
-              setSelectedQuality={seriesManager.setSelectedQuality}
-              isAdding={isDetailOpen && seriesManager.isAddingSeries}
-              error={isDetailOpen ? seriesManager.addSeriesError : null}
-              notices={isDetailOpen ? statusBanners : undefined}
-              onAdd={handleAddSeries}
-            />
-          )}
-          {detailMovie && (
-            <MovieDetailView
-              key={`movie-${detailMovie.id}`}
-              movie={detailMovie}
-              isJustAdded={detailMovie.id === justAddedMovieId}
-              download={downloadsManager.downloads[`movie-${detailMovie.id}`]}
-              queueItem={moviesManager.radarrQueue[detailMovie.id]}
-              movieStatus={moviesManager.getMovieStatus(detailMovie)}
-              config={configManager.config}
-              notices={isDetailOpen ? statusBanners : undefined}
-              // After a deletion: back to the list, nothing to reopen
-              onBack={() => closeDetail(true)}
-              onDownload={m => downloadsManager.handleDownloadMovie(m, configManager.config)}
-              onCancelDownload={downloadsManager.handleCancelDownload}
-              onPlay={playVideo}
-              onDeleteDownload={downloadsManager.handleDeleteDownload}
-              onDeleteServerMovie={moviesManager.handleDeleteServerMovie}
-              onCancelServerQueue={moviesManager.handleCancelQueueItem}
-              qualityProfiles={moviesManager.qualityProfiles}
-              onChangeQuality={moviesManager.handleChangeMovieQuality}
-            />
-          )}
-          {detailSeries && (
-            <SeriesDetailView
-              key={`series-${detailSeries.id}`}
-              series={detailSeries}
-              episodes={seriesManager.episodesCache[detailSeries.id] ?? []}
-              isLoadingEpisodes={seriesManager.isLoadingEpisodes}
-              downloads={downloadsManager.downloads}
-              sonarrQueue={seriesManager.sonarrQueue}
-              config={configManager.config}
-              notices={isDetailOpen ? statusBanners : undefined}
-              // After a deletion: back to the list, nothing to reopen
-              onBack={() => closeDetail(true)}
-              onPlay={playVideo}
-              onDownloadEpisode={(s, ep) =>
-                downloadsManager.handleDownloadEpisode(s, ep, configManager.config)
-              }
-              onCancelDownload={downloadsManager.handleCancelDownload}
-              onDeleteDownload={downloadsManager.handleDeleteDownload}
-              onDeleteSeries={seriesManager.handleDeleteSeries}
-              onDeleteEpisodeFile={seriesManager.handleDeleteEpisodeFile}
-              onCancelServerQueue={handleCancelServerQueueItem}
-              onSearchEpisode={seriesManager.handleSearchEpisode}
-              onSearchSeason={seriesManager.handleSearchSeason}
-            />
-          )}
-        </div>
-
-        {/* Trackpad swipe forward: the page about to reopen is signalled on the trailing
-            edge (decorative, the swipe has no keyboard counterpart to announce) */}
-        <div className="melia-swipe-hint" aria-hidden="true">
-          <ChevronRight className="melia-swipe-hint-icon" size={20} />
+          {detailPage && renderDetailPage(detailPage, isPreview)}
         </div>
       </main>
 

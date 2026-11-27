@@ -50,11 +50,19 @@ export function PageToolbar({ leading, back, tabs, areTabsShown = false, search 
   // Nothing over the content column (no back button, search or tabs): the material and
   // its fade would only blur the page under an empty row, so it fades out
   const isEmpty = !isBackShown && !search && !areTabsShown;
+  // Nothing but the back button could fill the row: the page under a detail page has an empty
+  // bar, so a swipe fades the material in and out with the detail page
+  const isBare = !search && !areTabsShown;
 
   return (
-    <header className="app-topbar" data-tauri-drag-region="true" data-empty={isEmpty ? 'true' : 'false'}>
-      {/* Translucent material over the content column; slides with it when the sidebar toggles */}
-      <div className="app-topbar-backdrop" data-sidebar-follow="" aria-hidden="true" />
+    <header
+      className="app-topbar"
+      data-tauri-drag-region="true"
+      data-empty={isEmpty ? 'true' : 'false'}
+      data-bare={isBare ? 'true' : 'false'}
+    >
+      {/* Translucent material over the content column */}
+      <div className="app-topbar-backdrop" aria-hidden="true" />
       <div className="app-topbar-lead" data-tauri-drag-region="true">
         {leading}
         {/* No drag attribute on the button: in Tauri only the clicked element counts, so it
@@ -112,7 +120,7 @@ function PageSearch({ search }: Readonly<{ search: PageToolbarSearch }>) {
   };
 
   return (
-    <div className="page-toolbar-search" role="search" data-sidebar-follow="">
+    <div className="page-toolbar-search" role="search" data-sidebar-follow="resize">
       <Input
         ref={inputRef}
         type="text"

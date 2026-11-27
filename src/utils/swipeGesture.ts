@@ -9,22 +9,18 @@ export const SWIPE_AXIS_LOCK_DISTANCE = 12;
 /** Horizontal only when |y| stays under this share of |x| when the axis is picked. */
 export const SWIPE_MAX_SLOPE = 0.5;
 /**
- * Back: CSS pixels the page moves per wheel pixel, constant (no resistance). A wheel
+ * CSS pixels the page moves per wheel pixel, constant (no resistance). A wheel
  * delta is the distance the content would scroll for the same movement, so 1 makes the
  * page move exactly as a scrolled page would under the same fingers.
  */
 export const SWIPE_GAIN = 1;
-/** Back: share of the page width, as seen on screen, that navigates on release. */
+/** Share of the page width, as seen on screen, that navigates on release. */
 export const SWIPE_COMMIT_SHARE = 0.35;
 /** A shorter flick still navigates when fast enough: page px, and page px per ms. */
 export const SWIPE_FLICK_MIN_DISTANCE = 40;
 export const SWIPE_FLICK_VELOCITY = 0.6;
-/**
- * Forward: there is no page to drag in, the list only leans (rubber band, at most
- * SWIPE_FORWARD_LIMIT px) and navigates past SWIPE_FORWARD_DISTANCE wheel px.
- */
-export const SWIPE_FORWARD_LIMIT = 96;
-export const SWIPE_FORWARD_DISTANCE = 160;
+/** px per ms back toward the start, at the release, that cancels the swipe. */
+export const SWIPE_CANCEL_VELOCITY = 0.15;
 /** End of a swipe (navigates or settles back): duration bounds, in ms. */
 export const SWIPE_SETTLE_MIN_MS = 120;
 export const SWIPE_SETTLE_MAX_MS = 300;
@@ -63,16 +59,8 @@ export function resolveSwipeAxis(sumX: number, sumY: number): SwipeAxis | null {
 }
 
 /**
- * Rubber band, only where there is nowhere to go (forward lean): follows 1:1 at first,
- * then resists more and more, never past `limit`. Negative distances give 0.
- */
-export function rubberBand(distance: number, limit: number): number {
-  if (distance <= 0 || limit <= 0) return 0;
-  return limit * (1 - 1 / (1 + distance / limit));
-}
-
-/**
- * Back: where the page is under the fingers, in CSS pixels, for a page `width` wide.
+ * How far the page has moved under the fingers (leaving when going back, entering when
+ * going forward), in CSS pixels, for a page `width` wide.
  * Linear: twice the movement moves the page twice as far, up to the width.
  */
 export function swipeOffset(distance: number, width: number): number {
@@ -80,11 +68,45 @@ export function swipeOffset(distance: number, width: number): number {
 }
 
 /**
- * At release: navigate or settle back. `travel` and `target` in the same unit as what is
- * shown (back: page px, target = SWIPE_COMMIT_SHARE of the width); `velocity` toward the
- * target, in that unit per ms. A short but quick flick navigates too.
+ * Horizontal translation, in px, of a computed `transform` value ("none", "matrix(...)" or
+ * "matrix3d(...)"). 0 when it cannot be read.
+ */
+export function readTranslateX(transform: string): number {
+  const match = /^matrix(3d)?\(([^)]*)\)$/.exec(transform.trim());
+  if (!match) return 0;
+  const values = match[2].split(',').map(part => Number.parseFloat(part));
+  const value = values[match[1] ? 12 : 4];
+  return Number.isFinite(value) ? value : 0;
+}
+
+/**
+ * How far the moving page has travelled (px from its resting side), from its horizontal
+ * translation on screen. Going back the page leaves to the right (translation = travel);
+ * going forward it comes in from the right (translation = width - travel).
+ */
+export function travelFromTranslate(direction: 'back' | 'forward', translateX: number, width: number): number {
+  const travel = direction === 'back' ? translateX : width - translateX;
+  return Math.min(Math.max(travel, 0), Math.max(width, 0));
+}
+
+/**
+ * Share (0 to 1) of the detail page that is on screen for a given travel: grows while it
+ * comes in (forward), shrinks while it leaves (back).
+ */
+export function detailPresence(direction: 'back' | 'forward', travel: number, width: number): number {
+  if (width <= 0) return direction === 'forward' ? 0 : 1;
+  const share = Math.min(Math.max(travel / width, 0), 1);
+  return direction === 'forward' ? share : 1 - share;
+}
+
+/**
+ * At release: navigate or settle back. `travel` and `target` in page px (target =
+ * SWIPE_COMMIT_SHARE of the width); `velocity` toward the target, in px per ms. A short but quick flick navigates too.
  */
 export function shouldCommitSwipe(travel: number, target: number, velocity: number): boolean {
+  // Fingers heading back toward the start when they leave: the swipe is called off,
+  // however far the page has gone
+  if (velocity <= -SWIPE_CANCEL_VELOCITY) return false;
   if (travel >= target) return true;
   return travel >= SWIPE_FLICK_MIN_DISTANCE && velocity >= SWIPE_FLICK_VELOCITY;
 }

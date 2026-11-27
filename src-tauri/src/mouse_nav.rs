@@ -7,14 +7,15 @@
 //!
 //! A local AppKit monitor reads both and tells the webview with the `mouse-nav` event
 //! ("back" or "forward"). The two-finger trackpad swipe is plain scrolling and stays on
-//! the page side (useBackForward).
+//! the page side (useBackForward); the page cannot tell when the fingers touch down or
+//! lift, so the monitor sends that too, with the `trackpad-touch` event ("begin" / "end").
 
 use std::ptr::NonNull;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use block2::RcBlock;
-use objc2_app_kit::{NSEvent, NSEventMask, NSEventType};
+use objc2_app_kit::{NSEvent, NSEventMask, NSEventPhase, NSEventType};
 use tauri::{AppHandle, Emitter};
 
 /// Button numbers of AppKit: 0 left, 1 right, 2 middle, 3 back, 4 forward.
@@ -25,8 +26,21 @@ const BUTTON_FORWARD: isize = 4;
 const REPEAT_GUARD: Duration = Duration::from_millis(350);
 
 pub const EVENT_NAME: &str = "mouse-nav";
+pub const TOUCH_EVENT_NAME: &str = "trackpad-touch";
 
-/// Direction of a swipe event, as in Safari and Chrome: positive deltaX goes back.
+/// Fingers on the trackpad for a scroll: "begin" when they touch down, "end" when they
+/// lift (the momentum that may follow has no phase of its own and sends nothing).
+fn touch_change(phase: NSEventPhase) -> Option<&'static str> {
+    if phase.contains(NSEventPhase::Began) || phase.contains(NSEventPhase::MayBegin) {
+        Some("begin")
+    } else if phase.contains(NSEventPhase::Ended) || phase.contains(NSEventPhase::Cancelled) {
+        Some("end")
+    } else {
+        None
+    }
+}
+
+/// Direction of a swipe event: positive deltaX goes back.
 fn swipe_direction(delta_x: f64) -> Option<&'static str> {
     if delta_x > 0.5 {
         Some("back")
@@ -54,6 +68,13 @@ pub fn install(app: &AppHandle) {
         let ns_event = unsafe { event.as_ref() };
         let kind = ns_event.r#type();
 
+        if kind == NSEventType::ScrollWheel {
+            if let Some(change) = touch_change(ns_event.phase()) {
+                let _ = app.emit(TOUCH_EVENT_NAME, change);
+            }
+            return event.as_ptr();
+        }
+
         let direction = if kind == NSEventType::Swipe {
             swipe_direction(ns_event.deltaX())
         } else if kind == NSEventType::OtherMouseUp {
@@ -75,7 +96,7 @@ pub fn install(app: &AppHandle) {
         event.as_ptr()
     });
 
-    let mask = NSEventMask::OtherMouseUp | NSEventMask::Swipe;
+    let mask = NSEventMask::OtherMouseUp | NSEventMask::Swipe | NSEventMask::ScrollWheel;
     // SAFETY: called on the main thread from the setup hook; the handler returns the event
     let monitor = unsafe { NSEvent::addLocalMonitorForEventsMatchingMask_handler(mask, &handler) };
     // The monitor lives as long as the app: never removed
@@ -91,6 +112,16 @@ mod tests {
         assert_eq!(swipe_direction(1.0), Some("back"));
         assert_eq!(swipe_direction(-1.0), Some("forward"));
         assert_eq!(swipe_direction(0.0), None);
+    }
+
+    #[test]
+    fn trackpad_touch_phases() {
+        assert_eq!(touch_change(NSEventPhase::Began), Some("begin"));
+        assert_eq!(touch_change(NSEventPhase::MayBegin), Some("begin"));
+        assert_eq!(touch_change(NSEventPhase::Ended), Some("end"));
+        assert_eq!(touch_change(NSEventPhase::Cancelled), Some("end"));
+        assert_eq!(touch_change(NSEventPhase::Changed), None);
+        assert_eq!(touch_change(NSEventPhase::None), None);
     }
 
     #[test]

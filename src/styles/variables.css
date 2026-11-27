@@ -16,12 +16,12 @@
   --border-strong: #757575; /* Field outlines, 3:1 on a card (--surface-1), 3.6:1 on the background */
   --border-default: rgba(255, 255, 255, 0.14); /* Quiet outline of a control at rest */
   --border-subtle: rgba(255, 255, 255, 0.09);  /* Separators: card edges, rows inside a card, sidebar edge */
-  --text-primary: rgba(255, 255, 255, 0.95);
-  --text-secondary: rgba(255, 255, 255, 0.7);  /* 5.9:1 on --surface-3 */
-  --text-tertiary: rgba(255, 255, 255, 0.58);  /* 5.1:1 on --surface-2, 4.6:1 on --surface-3 */
-  --text-placeholder: rgba(255, 255, 255, 0.6); /* Placeholders and key hints, 5.4:1 on --surface-2 */
-  /* Icons: the text greys above flattened onto --bg-base, so opaque. A translucent stroke
-     gets darker where two strokes overlap (the panel line of PanelLeft, the arrow tips). */
+  /* Text and icon greys are opaque: icons take the text colour, and a translucent stroke
+     gets darker where two of its lines cross */
+  --text-primary: #f4f4f4;
+  --text-secondary: #bcbcbc;    /* 5.9:1 on --surface-3 */
+  --text-tertiary: #a1a1a1;     /* 5.1:1 on --surface-2, 4.6:1 on --surface-3 */
+  --text-placeholder: #a5a5a5;  /* Placeholders and key hints, 5.4:1 on --surface-2 */
   --icon-primary: #f4f4f4;   /* = --text-primary (0.95) */
   --icon-hover: #d2d2d2;     /* = --sidebar-text-hover (0.8) */
   --icon-secondary: #bcbcbc; /* = --text-secondary (0.7) */
@@ -39,13 +39,13 @@
   --status-server: #3b82f6;
   --status-unavailable: #6b7280;
 
-  /* Typography: the Apple system font (SF Pro). WebKit picks the Text or Display cut
+  /* Typography: the system font (SF Pro on macOS). WebKit picks the Text or Display cut
      and its optical tracking by size; other platforms fall back to their UI font. */
   --font-heading: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, 'Segoe UI', Roboto, sans-serif;
   --font-body: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, 'Segoe UI', Roboto, sans-serif;
   --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, 'Segoe UI', Roboto, sans-serif;
 
-  /* Corner radii (macOS 26): rounder controls, capsules for toolbar items and buttons */
+  /* Corner radii: rounder controls, capsules for toolbar items and buttons */
   --radius-xs: 4px;     /* Checkboxes, key hints */
   --radius-sm: 8px;     /* Small fields, small icon buttons */
   --radius-md: 10px;    /* Fields, pop-up buttons */
@@ -53,7 +53,7 @@
   --radius-sheet: 26px; /* Modals and confirmations */
   --radius-pill: 999px; /* Push buttons, search field, toolbar buttons */
 
-  /* Liquid Glass: light translucent fills, a hairline edge and a soft highlight on top */
+  /* Glass: light translucent fills, a hairline edge and a soft highlight on top */
   --glass-fill: rgb(255 255 255 / 0.07);
   --glass-fill-hover: rgb(255 255 255 / 0.12);
   --glass-fill-active: rgb(255 255 255 / 0.16);
@@ -67,7 +67,7 @@
   --focus-ring: 3px solid var(--focus-ring-color);
   --focus-ring-offset: 1px;
 
-  /* Sidebar flush with the window edges (Finder style) */
+  /* Sidebar flush with the window edges */
   --sidebar-row-height: 32px;     /* Main entries (Films, Séries…): the whole row is the target */
   --sidebar-subrow-height: 30px;  /* Library groups under "Films": rows touch (no gap), same pitch as before */
   --sidebar-row-inset: 8px;       /* Selection inset from the sidebar edges */
@@ -76,13 +76,13 @@
   --sidebar-row-radius: 8px;      /* Shape of a row's focus ring (no fill) */
   --sidebar-fill: var(--surface-1);          /* Opaque by default (Windows, Linux) */
   --sidebar-text: var(--text-tertiary);      /* Entries at rest */
-  --sidebar-text-hover: rgb(255 255 255 / 0.8);
+  --sidebar-text-hover: #d2d2d2;
   --sidebar-text-active: var(--text-primary);
   /* Dotted rail under "Films": white hook on the group on screen, grey one on the group
      under the pointer or the keyboard focus */
   --sidebar-rail-active: rgb(255 255 255 / 0.8);
   --sidebar-rail-hover: rgb(255 255 255 / 0.28);
-  --sidebar-rail-dur: 250ms; /* Same as tabs sliding (transitions.dev) */
+  --sidebar-rail-dur: 250ms; /* Same as tabs sliding */
   --sidebar-rail-ease: var(--ease-smooth-out);
 
   /* Modular Scale (Major Third 1.250) */
@@ -112,35 +112,44 @@
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --transition-smooth: all var(--duration-base) var(--ease-out);
 
-  /* Motion tokens (transitions.dev scale), used by the sidebar and its toggle */
+  /* Motion tokens, used by the sidebar and its toggle */
   --duration-micro: 80ms;    /* Hover in */
   --duration-quick: 150ms;   /* Hover out, colour of a navigation row, reduced-motion fade */
   --duration-medium: 350ms;  /* Panel close */
   --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1); /* Panels: open, close, slide */
   --ease-in-out: ease-in-out; /* Icon swap */
   --blur-small: 2px;
-  --panel-open-dur: var(--duration-slow);    /* 400ms */
-  --panel-close-dur: var(--duration-medium); /* 350ms: closing is quicker than opening */
-  --panel-ease: var(--ease-smooth-out);
+  /* Multiplies the durations and delays of the sidebar toggle (layout.css and useSidebar):
+     raise it to watch the motion slowed down */
+  --motion-scale: 1;
+  /* Panel slide: moves from the first frame, softly, and slows down to land. Closing is
+     a little quicker than opening. */
+  --panel-open-dur: 400ms;
+  --panel-close-dur: 350ms;
+  --panel-ease: cubic-bezier(0.25, 0.1, 0.25, 1);
   --icon-swap-dur: 250ms;    /* Same both ways */
   --icon-swap-blur: var(--blur-small);
   --icon-swap-start-scale: 0.25;
   --icon-swap-ease: var(--ease-in-out);
-  /* Text swap soft: page title <-> back button in the top row */
+  /* Text swap: page title <-> back button in the top row */
   --text-swap-dur: var(--duration-quick); /* 150ms */
   --text-swap-blur: var(--blur-small);
   --text-swap-ease: var(--ease-in-out);
   /* Top tabs (sidebar hidden): they come in once the sidebar has started to leave, from
      its side, one after the other; they leave faster, all at once, as it comes back */
   --duration-stagger: 40ms;  /* Per-item stagger offset */
-  --top-tabs-enter-dur: 250ms;
-  --top-tabs-enter-delay: var(--duration-micro); /* 80ms */
-  --top-tabs-exit-dur: var(--duration-quick);    /* 150ms */
-  --top-tabs-ease: var(--ease-smooth-out);
-  --top-tabs-distance: 8px;
+  /* Overlap and follow-through: the capsule starts while the sidebar is still halfway
+     out, then its labels follow 25ms apart, so one motion leads into the next */
+  --top-tabs-enter-dur: 450ms;
+  --top-tabs-enter-delay: 100ms;
+  --top-tabs-exit-dur: 250ms;
+  --top-tabs-ease: cubic-bezier(0.25, 1, 0.5, 1);     /* Out-quart: settles softly */
+  --top-tabs-exit-ease: cubic-bezier(0.5, 0, 0.75, 0); /* In-quart: leaves as the sidebar comes */
+  --top-tabs-stagger: 25ms;
+  --top-tabs-distance: 6px;        /* The capsule settles from a little above... */
+  --top-tabs-hidden-scale: 0.96;   /* ...and a little smaller. Opacity and transform only: no blur on glass */
   --top-tabs-label-distance: 4px;
-  --top-tabs-blur: var(--blur-small);
-  --top-tabs-exit-scale: 0.98;
+  --top-tabs-label-dur: 400ms;
   /* Tabs sliding: active pill moving between tabs */
   --tabs-dur: 250ms;
   --tabs-ease: var(--ease-smooth-out);
@@ -153,13 +162,14 @@
   --page-exit-enabled: 1;
   --page-slide-ease: var(--ease-smooth-out);
   --page-fade-ease: var(--ease-smooth-out);
-  /* Trackpad swipe back (Safari-like): the movie page follows the fingers to the right,
-     1:1, the page below comes from a quarter to the left and brightens in step. The end
-     (duration and curve) continues the gesture's speed: computed by useBackForward. */
-  --swipe-parallax: -25%;      /* Page below, at the start of the swipe */
-  --swipe-dim: 0.6;            /* Its opacity at the start, over the dark content background */
-  --swipe-edge-shadow: -12px 0 32px rgb(0 0 0 / 0.45); /* Leading edge of the page leaving */
-  --swipe-hint-distance: 24px; /* Forward hint: slides in from the trailing edge */
+  /* Trackpad swipe: the detail page follows the fingers 1:1 (to the right when going back,
+     in from the right when going forward); the page below sits a quarter to the left and
+     dimmed while the detail page covers it. The end (duration and curve) continues the
+     gesture's speed: computed by useBackForward. */
+  --swipe-parallax: -25%;      /* Page below, when the detail page covers it */
+  --swipe-dim: 0.6;            /* Its opacity then, over the dark content background */
+  --swipe-edge-shadow-alpha: 0.45;
+  --swipe-edge-shadow: -12px 0 32px rgb(0 0 0 / var(--swipe-edge-shadow-alpha)); /* Leading edge of the moving page */
   --titlebar-height: 52px;  /* Top row: traffic lights (trafficLightPosition x 20, y 29), logo, sidebar toggle, page title and search */
   --content-max-width: 1600px; /* Content column of the libraries */
   --view-narrow-width: 900px;  /* Content column of the downloads and settings pages */

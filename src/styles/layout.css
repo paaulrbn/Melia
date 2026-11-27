@@ -19,28 +19,20 @@
   background: linear-gradient(to right, transparent var(--sidebar-docked-width), var(--bg-base) 0);
 }
 
-/* macOS: the opaque background moves with the content instead of being painted by the
-   shell. The shell's gradient switches at once when the sidebar is toggled, while the
-   sidebar and the content slide (FLIP): on opening, the whole sidebar column turned
-   transparent and showed the raw window material before the sidebar got there.
-   Carried by the content, the opaque area slides in step with the sidebar, so the
-   material only shows where the sidebar already is, opening and closing alike.
-   The shadow repeats the background one sidebar width to the right: while the content
-   starts shifted to the left on opening, it keeps the window's trailing edge opaque. */
+/* macOS: the opaque background is painted by the content instead of the shell, so the
+   native material only shows in the sidebar column. */
 :root.is-macos .melia-app {
   background: none;
 }
 
 :root.is-macos .melia-content {
   background-color: var(--bg-base);
-  box-shadow: var(--sidebar-width) 0 0 var(--bg-base);
 }
 
-/* Hidden sidebar: the content takes the whole width */
+/* Hidden sidebar: its column is empty and the content takes the whole width. While the
+   sidebar slides, useSidebar writes this variable inline every frame. */
 .melia-app.is-sidebar-collapsed {
   --sidebar-docked-width: 0px;
-
-  grid-template-columns: minmax(0, 1fr);
 }
 
 @media (max-width: 999px) {
@@ -84,9 +76,9 @@
    sidebar's edge, or from the window edge while it is hidden. Tint 78 % of the window
    background: over pure white, the secondary text (back button) keeps 5:1 and the title
    7.5:1, while posters still show through. It slides with the content when the sidebar
-   is toggled (FLIP, data-sidebar-follow) and lets clicks through to the drag area.
-   macOS 26 scroll edge: no hairline; the material runs a little past the row and fades
-   out, so the content dissolves under the toolbar instead of meeting a line. */
+   is toggled (it follows the docked width) and lets clicks through to the drag area.
+   No hairline: the material runs a little past the row and fades out, so the content
+   dissolves under the toolbar. */
 .app-topbar-backdrop {
   --scroll-edge: var(--space-md);
 
@@ -137,6 +129,19 @@
   opacity: 0;
 }
 
+/* Trackpad swipe over a page whose row is bare (nothing but the back button): the material
+   follows the detail page, 0 when it is off screen to 1 when it covers the page. Without
+   transition under the fingers; the end of the gesture uses the page's own duration and
+   curve, so both finish together. Set by useBackForward on the app root. */
+.melia-app[data-swipe-bar] .app-topbar[data-bare='true'] .app-topbar-backdrop {
+  opacity: var(--swipe-bar, 0);
+  transition: none;
+}
+
+.melia-app[data-swipe-bar][data-swipe-settle] .app-topbar[data-bare='true'] .app-topbar-backdrop {
+  transition: opacity var(--swipe-settle-dur, 250ms) var(--swipe-settle-ease, linear);
+}
+
 /* Window bar then back button. Spans the sidebar column too: docked, the window bar
    fills it; hidden, that column is 0 wide and both share the lead column. */
 .app-topbar-lead {
@@ -151,8 +156,8 @@
 }
 
 /* Traffic lights, logo and toggle. Pinned to the window corner so it never moves
-   between sidebar states: as wide as the docked sidebar, or just its content while
-   hidden, so the back button starts right after it.
+   between sidebar states: at least as wide as the docked sidebar, or just its content
+   while hidden, so the back button starts right after it.
    The traffic lights are physical window geometry: left, not inline-start. */
 .window-bar {
   position: relative;
@@ -162,14 +167,10 @@
   align-items: center;
   gap: var(--space-xs);
   box-sizing: border-box;
-  width: var(--sidebar-docked-width);
+  min-width: var(--sidebar-docked-width);
   height: 100%;
   /* Clear the traffic lights with the same gap as between two toolbar groups */
   padding-inline: calc(var(--window-controls-width) + var(--space-md)) var(--space-xs);
-}
-
-.is-sidebar-collapsed .window-bar {
-  width: auto;
 }
 
 .window-bar-logo {
@@ -185,7 +186,7 @@
   pointer-events: none;
 }
 
-/* Toolbar button (macOS 26): a borderless capsule that only fills on hover.
+/* Toolbar button: a borderless capsule that only fills on hover.
    Colour only, not the generic `all` of .ui-icon-btn: quick hover in, softer hover out */
 .window-bar-toggle.ui-icon-btn {
   border-radius: var(--radius-pill);
@@ -198,15 +199,27 @@
 .window-bar-toggle {
   transition:
     background-color var(--duration-quick) var(--ease-out),
-    color var(--duration-quick) var(--ease-out);
+    color var(--duration-quick) var(--ease-out),
+    scale var(--duration-quick) var(--ease-smooth-out);
 }
 
 .window-bar-toggle:hover {
   transition-duration: var(--duration-micro);
 }
 
+/* Pressed: the capsule gives way a little under the finger, then springs back */
+.window-bar-toggle:active:not(:disabled) {
+  scale: 0.96;
+}
+
 .window-bar-toggle svg {
   stroke-width: 1.75;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .window-bar-toggle:active:not(:disabled) {
+    scale: none;
+  }
 }
 
 /* ==========================================================================
@@ -296,8 +309,8 @@
   color: var(--icon-primary);
 }
 
-/* Back button in / out (transitions.dev text swap soft + icon swap): it fades with a
-   light blur in place, the chevron grows in like an icon swap. Visibility flips once
+/* Back button in / out: it fades with a light blur in place, the chevron grows in.
+   Visibility flips once
    the fade is over, so the hidden button leaves the tab order and the accessibility tree. */
 .page-toolbar-back {
   transition:
@@ -344,6 +357,33 @@
   transform: scale(var(--icon-swap-start-scale));
 }
 
+/* Swipe forward in progress: the hidden button appears with the page coming in, with the
+   same fade, blur and growing chevron as its usual entrance, driven by --swipe-bar. No
+   transition under the fingers; the end uses the page's duration and curve. */
+.melia-app[data-swipe-bar='forward'] .page-toolbar-heading[data-state='none'] .page-toolbar-back {
+  opacity: var(--swipe-bar, 0);
+  filter: blur(calc((1 - var(--swipe-bar, 0)) * var(--text-swap-blur)));
+  visibility: visible;
+  transition: none;
+}
+
+.melia-app[data-swipe-bar='forward'] .page-toolbar-heading[data-state='none'] .page-toolbar-back-icon {
+  opacity: 1;
+  filter: none;
+  transform: scale(calc(var(--icon-swap-start-scale) + (1 - var(--icon-swap-start-scale)) * var(--swipe-bar, 0)));
+  transition: none;
+}
+
+.melia-app[data-swipe-bar='forward'][data-swipe-settle] .page-toolbar-heading[data-state='none'] .page-toolbar-back {
+  transition:
+    opacity var(--swipe-settle-dur, 250ms) var(--swipe-settle-ease, linear),
+    filter var(--swipe-settle-dur, 250ms) var(--swipe-settle-ease, linear);
+}
+
+.melia-app[data-swipe-bar='forward'][data-swipe-settle] .page-toolbar-heading[data-state='none'] .page-toolbar-back-icon {
+  transition: transform var(--swipe-settle-dur, 250ms) var(--swipe-settle-ease, linear);
+}
+
 /* Reduced motion: no blur or scale; the global rule makes the swap immediate. The
    swipe back keeps only its colour cue, the chevron stays in place. */
 @media (prefers-reduced-motion: reduce) {
@@ -359,12 +399,21 @@
   }
 }
 
-/* Search field (macOS 26 toolbar): a glass capsule, translucent fill over the blurred
+/* Search field: a glass capsule, translucent fill over the blurred
    bar, hairline edge and a soft top highlight; slightly brighter on hover; the system
    focus ring while typing. Not a drag area. */
 .page-toolbar-search {
   grid-column: 3;
+  /* The field inside is anchored to the edge the column holds still, and may be given
+     another width while the sidebar slides without moving the columns */
+  display: flex;
+  justify-content: flex-start;
   min-width: 0;
+  contain: inline-size;
+}
+
+.page-toolbar-search > .ui-input-wrapper {
+  flex: none;
 }
 
 .page-toolbar-search .ui-input-container {
@@ -471,28 +520,27 @@
 }
 
 /* ==========================================================================
-   Top tabs (iPadOS style): while the sidebar is hidden, the main pages float as a
+   Top tabs: while the sidebar is hidden, the main pages float as a
    glass capsule in the middle of the top row, and the search moves to the trailing
    side, its edge on the content's edge.
-   Columns: (0px sidebar) | lead | tabs | trail. Lead and trail share the space equally,
-   so the tabs sit on the window's axis; when the lead (window bar, back button) needs
-   more than its half, the tabs move over instead of covering it. The trail never gets
-   narrower than the smallest search: on the narrowest window (800px) everything fits.
+   Columns: (sidebar space, 0px once hidden) | lead | tabs | trail. Lead and trail share
+   the space equally, so the tabs sit on the window's axis; when the lead (window bar,
+   back button) needs more than its half, the tabs move over instead of covering it. The
+   trail never gets narrower than the smallest search: on the narrowest window (800px)
+   everything fits. The lead keeps spanning the sidebar space, so the window bar never
+   moves while that space shrinks.
    ========================================================================== */
 .melia-app.is-sidebar-collapsed .app-topbar {
   /* Trailing edge of the content column, shared by the search */
   --topbar-trail-edge: max(var(--content-gutter), calc((100vw - var(--content-max-width)) / 2));
 
-  grid-template-columns: 0px minmax(min-content, 1fr) auto minmax(min-content, 1fr);
-}
-
-.melia-app.is-sidebar-collapsed .app-topbar-lead {
-  grid-column: 2;
+  grid-template-columns: var(--sidebar-docked-width) minmax(min-content, 1fr) auto minmax(min-content, 1fr);
 }
 
 .melia-app.is-sidebar-collapsed .page-toolbar-search {
   grid-column: 4;
   justify-self: end;
+  justify-content: flex-end;
   box-sizing: content-box;
   width: calc(100% - var(--space-sm) - var(--topbar-trail-edge));
   min-width: var(--search-collapsed-min-width);
@@ -550,7 +598,9 @@
   top: auto;
   left: auto;
   grid-column: 3;
-  translate: none;
+  /* The sidebar space pushes the middle columns: half of it is taken back so the tabs
+     stay on the window's axis while it slides */
+  translate: calc(var(--sidebar-docked-width) / -2) 0;
   margin-inline: var(--space-sm);
 }
 
@@ -606,7 +656,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Tabs sliding (transitions.dev): TopTabs writes the active tab's offset and width,
+/* Tabs sliding: TopTabs writes the active tab's offset and width,
    the transition carries the pill from one tab to the other */
 .top-tabs-pill {
   position: absolute;
@@ -621,7 +671,6 @@
   transition:
     transform var(--tabs-dur) var(--tabs-ease),
     width var(--tabs-dur) var(--tabs-ease);
-  will-change: transform, width;
   pointer-events: none;
 }
 
@@ -638,52 +687,57 @@
 }
 
 /* In and out, with the sidebar. Transitions, so a toggle mid-way reverses from there.
-   In (sidebar leaving): once it has started to go, the capsule comes from its side with
-   a light blur, then the labels one after the other (40ms apart). Out (sidebar coming
-   back): quicker, all at once, back toward the sidebar, a little smaller. Visibility
-   flips once the fade is over. Not a sidebar follower: useSidebar's FLIP never moves it. */
+   Opacity and transform only (no blur: it would turn the glass capsule into an offscreen
+   filter layer on every frame). In (sidebar leaving): once the search has left the middle,
+   the capsule settles from a little above and smaller, then the labels rise one after the
+   other (40ms apart). Out (sidebar coming back): quicker, all at once, same way back.
+   Visibility flips once the fade is over. useSidebar never moves it. */
 .top-tabs {
+  --tabs-in-dur: calc(var(--top-tabs-enter-dur) * var(--motion-scale));
+  --tabs-in-delay: calc(var(--top-tabs-enter-delay) * var(--motion-scale));
+  --tabs-out-dur: calc(var(--top-tabs-exit-dur) * var(--motion-scale));
+
   transition:
-    opacity var(--top-tabs-enter-dur) var(--top-tabs-ease) var(--top-tabs-enter-delay),
-    transform var(--top-tabs-enter-dur) var(--top-tabs-ease) var(--top-tabs-enter-delay),
-    filter var(--top-tabs-enter-dur) var(--top-tabs-ease) var(--top-tabs-enter-delay),
+    opacity var(--tabs-in-dur) var(--top-tabs-ease) var(--tabs-in-delay),
+    transform var(--tabs-in-dur) var(--top-tabs-ease) var(--tabs-in-delay),
     visibility 0s linear 0s;
 }
 
 .top-tabs[data-shown='false'] {
   opacity: 0;
-  transform: translateX(calc(var(--top-tabs-distance) * -1)) scale(var(--top-tabs-exit-scale));
-  filter: blur(var(--top-tabs-blur));
+  transform: translateY(calc(var(--top-tabs-distance) * -1)) scale(var(--top-tabs-hidden-scale));
   visibility: hidden;
   pointer-events: none;
   transition:
-    opacity var(--top-tabs-exit-dur) var(--top-tabs-ease),
-    transform var(--top-tabs-exit-dur) var(--top-tabs-ease),
-    filter var(--top-tabs-exit-dur) var(--top-tabs-ease),
-    visibility 0s linear var(--top-tabs-exit-dur);
+    opacity var(--tabs-out-dur) var(--top-tabs-exit-ease),
+    transform var(--tabs-out-dur) var(--top-tabs-exit-ease),
+    visibility 0s linear var(--tabs-out-dur);
 }
 
 .top-tab {
-  --tab-enter-delay: calc(var(--top-tabs-enter-delay) + var(--tab-index, 0) * var(--duration-stagger));
+  --tab-enter-delay: calc(
+    (var(--top-tabs-enter-delay) + 60ms + var(--tab-index, 0) * var(--top-tabs-stagger)) * var(--motion-scale)
+  );
+  --tab-label-dur: calc(var(--top-tabs-label-dur) * var(--motion-scale));
 
   transition:
     color var(--duration-quick) var(--ease-out),
     scale var(--duration-quick) var(--ease-out),
-    opacity var(--top-tabs-enter-dur) var(--top-tabs-ease) var(--tab-enter-delay),
-    transform var(--top-tabs-enter-dur) var(--top-tabs-ease) var(--tab-enter-delay);
+    opacity var(--tab-label-dur) var(--top-tabs-ease) var(--tab-enter-delay),
+    transform var(--tab-label-dur) var(--top-tabs-ease) var(--tab-enter-delay);
 }
 
 .top-tabs[data-shown='false'] .top-tab {
   opacity: 0;
-  transform: translateX(calc(var(--top-tabs-label-distance) * -1));
+  transform: translateY(var(--top-tabs-label-distance));
   transition:
     color var(--duration-quick) var(--ease-out),
     scale var(--duration-quick) var(--ease-out),
-    opacity var(--top-tabs-exit-dur) var(--top-tabs-ease),
-    transform var(--top-tabs-exit-dur) var(--top-tabs-ease);
+    opacity var(--tabs-out-dur) var(--top-tabs-exit-ease),
+    transform var(--tabs-out-dur) var(--top-tabs-exit-ease);
 }
 
-/* Reduced motion: no slide, scale or blur, no delay; the global rule makes the change
+/* Reduced motion: no slide or scale, no delay; the global rule makes the change
    immediate, the pill jumps to the new tab */
 @media (prefers-reduced-motion: reduce) {
   .top-tabs,
@@ -691,7 +745,6 @@
   .top-tab,
   .top-tabs[data-shown='false'] .top-tab {
     transform: none;
-    filter: none;
     transition-delay: 0s !important;
   }
 
@@ -707,83 +760,53 @@
 /* ==========================================================================
    Sidebar
    ========================================================================== */
-/* Classic Mac sidebar (Finder, Notes, Mail): flush with the window's top, left and
+/* Sidebar: flush with the window's top, left and
    bottom edges, the traffic lights drawn over its top corner. --sidebar-fill is a light
    tint over the native window material on macOS; elsewhere, and with less transparency,
    it is opaque. A single hairline on its right separates it from the content.
-   Physical side: the sidebar is always on the window's left, like the traffic lights. */
+   Physical side: the sidebar is always on the window's left, like the traffic lights.
+   Out of the grid and always as wide as itself: it slides, its right edge on the docked
+   width, so its content never gets squeezed. */
 .sidebar {
   --sidebar-icon-size: 16px;
 
-  grid-row: 1 / -1;
-  grid-column: 1;
-  position: relative;
-  z-index: 40;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-  min-height: 0;
-  border-right: 1px solid var(--border-subtle);
-  background-color: var(--sidebar-fill);
-  overflow: clip;
-}
-
-/* Hidden: out of the grid, parked just past the window edge, transparent and unreachable.
-   Its travel equals its width, so it moves in step with the content when docked or
-   hidden with the toggle. */
-.sidebar.is-collapsed {
   position: fixed;
   top: 0;
   bottom: 0;
   left: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
   width: var(--sidebar-width);
-  transform: translateX(-100%);
-  opacity: 0;
+  min-height: 0;
+  border-right: 1px solid var(--border-subtle);
+  background-color: var(--sidebar-fill);
+  overflow: clip;
+  transform: translateX(calc(var(--sidebar-docked-width) - var(--sidebar-width)));
+}
+
+/* Hidden: unreachable once the slide out is over */
+.sidebar.is-collapsed {
   visibility: hidden;
 }
 
-/* Panel reveal (transitions.dev), without its blur. Transitions, not keyframes:
-   a toggle mid-slide reverses from where the panel is. */
+/* Panel reveal. The slide is not a CSS transition: useSidebar writes the docked width every
+   frame, with --panel-open-dur / --panel-close-dur and --panel-ease. Only visibility is
+   timed here: it flips once the slide out is over. */
 @media (prefers-reduced-motion: no-preference) {
-  /* Opening (docking from hidden) */
   .sidebar {
-    transition:
-      transform var(--panel-open-dur) var(--panel-ease),
-      opacity var(--panel-open-dur) var(--panel-ease),
-      visibility 0s linear 0s;
+    transition: visibility 0s linear 0s;
   }
 
-  /* Closing is quicker than opening; visibility flips once the slide is over */
   .sidebar.is-collapsed {
-    transition:
-      transform var(--panel-close-dur) var(--panel-ease),
-      opacity var(--panel-close-dur) var(--panel-ease),
-      visibility 0s linear var(--panel-close-dur);
-  }
-
-  /* Content, back button and search: useSidebar moves them back to where they were
-     before the toggle, then lets this transition bring them to their new place,
-     in step with the sidebar */
-  [data-sidebar-follow] {
-    transition: transform var(--panel-close-dur) var(--panel-ease);
-  }
-
-  .melia-app:not(.is-sidebar-collapsed) [data-sidebar-follow] {
-    transition-duration: var(--panel-open-dur);
+    transition: visibility 0s linear calc(var(--panel-close-dur) * var(--motion-scale));
   }
 
   /* Top row material: it also fades in and out when the row fills or empties
      (page change, sidebar toggle), at its own pace beside the slide */
-  .app-topbar-backdrop[data-sidebar-follow] {
-    transition:
-      transform var(--panel-close-dur) var(--panel-ease),
-      opacity var(--duration-fast) var(--ease-out);
-  }
-
-  .melia-app:not(.is-sidebar-collapsed) .app-topbar-backdrop[data-sidebar-follow] {
-    transition:
-      transform var(--panel-open-dur) var(--panel-ease),
-      opacity var(--duration-fast) var(--ease-out);
+  .app-topbar-backdrop {
+    transition: opacity calc(var(--duration-fast) * var(--motion-scale)) var(--ease-out);
   }
 }
 
@@ -791,16 +814,6 @@
 @media (prefers-reduced-motion: reduce) {
   .app-topbar-backdrop {
     transition: opacity var(--duration-quick) linear;
-  }
-}
-
-/* Reduced motion: no slide, a short cross-fade; the content changes place at once */
-@media (prefers-reduced-motion: reduce) {
-  .sidebar.is-collapsed {
-    transform: none;
-    transition:
-      opacity var(--duration-quick) linear,
-      visibility 0s linear var(--duration-quick);
   }
 }
 
@@ -1091,11 +1104,11 @@
   scroll-margin-top: var(--space-lg);
 }
 
-/* Page side-by-side (transitions.dev): the list leaves to the leading side, the detail
-   page comes from the trailing side, with a fade and a light blur. Transitions, not
-   keyframes: going back mid-slide reverses from where the pages are.
-   Adapted from the snippet: the pages share one grid cell instead of `position: absolute`
-   (each keeps its own height and scroll); at rest they carry no transform, filter or
+/* Page side-by-side: the list leaves to the leading side, the detail page comes from the
+   trailing side, with a fade and a light blur. Transitions, not keyframes: going back
+   mid-slide reverses from where the pages are.
+   The pages share one grid cell instead of `position: absolute` (each keeps its own
+   height and scroll); at rest they carry no transform, filter or
    will-change, so fixed dialogs inside them (confirmations) still cover the window;
    the hidden page also leaves the accessibility tree once it has faded (visibility). */
 .t-page-slide {
@@ -1152,11 +1165,11 @@
   }
 }
 
-/* Trackpad swipe (useBackForward), like Safari. While the fingers move, the hook writes
-   --swipe-x (px), --swipe-reveal (share of the width uncovered) and --swipe-progress
-   (share of the distance that navigates) every frame: no transition, transform and
-   opacity only. On release, data-swipe-settle brings the transitions back for the end:
-   the page finishes its way out (commit) or settles back (cancel), at the gesture's speed.
+/* Trackpad swipe (useBackForward). While the fingers move, the hook writes
+   --swipe-x (px, how far the moving page has travelled) and --swipe-reveal (the same as a
+   share of the width) every frame: no transition, transform and opacity only. On release,
+   data-swipe-settle brings the transitions back for the end: the page finishes its way
+   (commit) or settles back (cancel), at the gesture's speed.
    Never set under reduced motion: the swipe then only navigates, with the usual fade. */
 .t-page-slide[data-swipe] .t-page {
   transition: none;
@@ -1179,92 +1192,41 @@
   transform: translateX(var(--swipe-x, 0px));
 }
 
-/* Forward: there is no page to drag in yet, so the list leans toward the fingers (with a
-   strong resistance) and a hint comes in from the trailing edge */
+/* Forward: the mirror of back. The page to reopen (rendered inert for the gesture) follows
+   the fingers in from the right, opaque, its leading edge shadowed; the list recedes a
+   quarter to the left and dims as the page covers it. Starts fully off screen: --swipe-x
+   is 0 until the first frame. */
 .t-page-slide[data-swipe='forward'] .t-page[data-page-id='1'] {
-  transform: translateX(calc(var(--swipe-x, 0px) * -1));
+  opacity: calc(1 - (1 - var(--swipe-dim)) * var(--swipe-reveal, 0));
+  transform: translateX(calc(var(--swipe-parallax) * var(--swipe-reveal, 0)));
+}
+
+.t-page-slide[data-swipe='forward'] .t-page[data-page-id='2'] {
+  visibility: visible;
+  filter: none;
+  opacity: 1;
+  background-color: var(--bg-base);
+  /* Shadow faded in over the first pixels so the waiting page casts none into view */
+  box-shadow: -12px 0 32px rgb(0 0 0 / calc(var(--swipe-edge-shadow-alpha) * min(1, var(--swipe-reveal, 0) * 20)));
+  transform: translateX(calc(100% - var(--swipe-x, 0px)));
 }
 
 /* End of the gesture: the hook sets the duration and a curve that starts at the page's
-   speed on release (no ease restarting from scratch); the page below and the hint use
-   the same curve so they stay in step */
-.t-page-slide[data-swipe-settle] .t-page,
-.t-page-slide[data-swipe-settle] .melia-swipe-hint {
+   speed on release (no ease restarting from scratch); both pages use the same curve so
+   they stay in step */
+.t-page-slide[data-swipe-settle] .t-page {
   transition:
     transform var(--swipe-settle-dur, 250ms) var(--swipe-settle-ease, linear),
     opacity var(--swipe-settle-dur, 250ms) var(--swipe-settle-ease, linear);
 }
 
 /* End of a swipe: the pages take their new resting state without sliding back */
-.t-page-slide[data-swipe-instant] .t-page,
-.t-page-slide[data-swipe-instant] .melia-swipe-hint {
+.t-page-slide[data-swipe-instant] .t-page {
   transition: none !important;
-}
-
-/* Forward hint: a round glass button with a chevron, on the trailing edge, centred.
-   It fades and slides in with the swipe, and fills once a release would navigate. */
-.melia-swipe-hint {
-  grid-area: 1 / 1;
-  align-self: center;
-  justify-self: end;
-  position: relative;
-  z-index: 1;
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  margin-inline-end: var(--space-md);
-  border-radius: 50%;
-  background-color: var(--bg-surface);
-  box-shadow: var(--glass-shadow), inset 0 0 0 0.5px rgb(255 255 255 / 0.16);
-  color: var(--text-primary);
-  pointer-events: none;
-  opacity: 0;
-  transform: translateX(var(--swipe-hint-distance));
-  transition:
-    opacity var(--duration-quick) var(--ease-smooth-out),
-    transform var(--duration-quick) var(--ease-smooth-out);
-}
-
-.melia-swipe-hint::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background-color: var(--fill-primary);
-  opacity: 0;
-  transition: opacity var(--duration-quick) var(--ease-smooth-out);
-}
-
-.melia-swipe-hint-icon {
-  position: relative;
-  stroke-width: 2;
-  transition: color var(--duration-quick) var(--ease-smooth-out);
-}
-
-.t-page-slide[data-swipe='forward'] .melia-swipe-hint {
-  opacity: var(--swipe-progress, 0);
-  transform: translateX(calc(var(--swipe-hint-distance) * (1 - var(--swipe-progress, 0))));
-}
-
-.t-page-slide[data-swipe='forward']:not([data-swipe-settle]) .melia-swipe-hint {
-  transition: none;
-}
-
-.t-page-slide[data-swipe='forward'][data-swipe-ready] .melia-swipe-hint::before {
-  opacity: 1;
-}
-
-.t-page-slide[data-swipe='forward'][data-swipe-ready] .melia-swipe-hint-icon {
-  color: var(--bg-base);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .t-page-slide[data-swipe] .t-page {
     transform: none;
-  }
-
-  .melia-swipe-hint {
-    display: none;
   }
 }

@@ -7,12 +7,15 @@ import {
   SWIPE_FLICK_VELOCITY,
   SWIPE_SETTLE_MAX_MS,
   SWIPE_SETTLE_MIN_MS,
+  detailPresence,
   isMomentum,
+  readTranslateX,
+  travelFromTranslate,
   settleMotion,
   isRunStart,
   resolveSwipeAxis,
-  rubberBand,
   shouldCommitSwipe,
+  SWIPE_CANCEL_VELOCITY,
   swipeOffset,
   trackMomentum,
 } from './swipeGesture';
@@ -55,7 +58,7 @@ describe('resolveSwipeAxis', () => {
   });
 });
 
-describe('swipeOffset (swipe back)', () => {
+describe('swipeOffset', () => {
   it('is linear: twice the movement moves the page twice as far', () => {
     expect(swipeOffset(200, 1000)).toBe(2 * swipeOffset(100, 1000));
     expect(swipeOffset(400, 1000)).toBe(2 * swipeOffset(200, 1000));
@@ -71,12 +74,57 @@ describe('swipeOffset (swipe back)', () => {
   });
 });
 
-describe('rubberBand (forward lean, nowhere to drag a page from)', () => {
-  it('resists without ever passing the limit', () => {
-    expect(rubberBand(0, 100)).toBe(0);
-    expect(rubberBand(-50, 100)).toBe(0);
-    expect(rubberBand(1e6, 100)).toBeLessThan(100);
-    expect(rubberBand(200, 100)).toBeGreaterThan(rubberBand(100, 100));
+describe('readTranslateX', () => {
+  it('reads the translation of a 2D matrix', () => {
+    expect(readTranslateX('matrix(1, 0, 0, 1, 123.5, 0)')).toBe(123.5);
+    expect(readTranslateX('matrix(1, 0, 0, 1, -40, 0)')).toBe(-40);
+  });
+
+  it('reads the translation of a 3D matrix', () => {
+    expect(readTranslateX('matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 88, 0, 0, 1)')).toBe(88);
+  });
+
+  it('is 0 for none or anything unreadable', () => {
+    expect(readTranslateX('none')).toBe(0);
+    expect(readTranslateX('')).toBe(0);
+    expect(readTranslateX('translateX(10px)')).toBe(0);
+    expect(readTranslateX('matrix(1, 0, 0, 1, abc, 0)')).toBe(0);
+  });
+});
+
+describe('travelFromTranslate', () => {
+  it('is the translation itself going back', () => {
+    expect(travelFromTranslate('back', 300, 1000)).toBe(300);
+  });
+
+  it('is the width minus the translation going forward', () => {
+    expect(travelFromTranslate('forward', 700, 1000)).toBe(300);
+  });
+
+  it('stays between 0 and the width', () => {
+    expect(travelFromTranslate('back', -20, 1000)).toBe(0);
+    expect(travelFromTranslate('back', 1200, 1000)).toBe(1000);
+    expect(travelFromTranslate('forward', 1200, 1000)).toBe(0);
+    expect(travelFromTranslate('forward', -5, 1000)).toBe(1000);
+  });
+});
+
+describe('detailPresence', () => {
+  it('grows from 0 to 1 going forward', () => {
+    expect(detailPresence('forward', 0, 1000)).toBe(0);
+    expect(detailPresence('forward', 250, 1000)).toBe(0.25);
+    expect(detailPresence('forward', 1000, 1000)).toBe(1);
+  });
+
+  it('shrinks from 1 to 0 going back', () => {
+    expect(detailPresence('back', 0, 1000)).toBe(1);
+    expect(detailPresence('back', 250, 1000)).toBe(0.75);
+    expect(detailPresence('back', 1000, 1000)).toBe(0);
+  });
+
+  it('handles an unmeasured width', () => {
+    expect(detailPresence('forward', 10, 0)).toBe(0);
+    expect(detailPresence('back', 10, 0)).toBe(1);
   });
 });
 
@@ -96,6 +144,11 @@ describe('shouldCommitSwipe', () => {
 
   it('ignores a tiny movement however fast', () => {
     expect(shouldCommitSwipe(SWIPE_FLICK_MIN_DISTANCE - 1, target, 10)).toBe(false);
+  });
+
+  it('cancels when the fingers head back at the release, however far the page went', () => {
+    expect(shouldCommitSwipe(width * 0.8, target, -SWIPE_CANCEL_VELOCITY)).toBe(false);
+    expect(shouldCommitSwipe(width * 0.8, target, -SWIPE_CANCEL_VELOCITY / 2)).toBe(true);
   });
 });
 
