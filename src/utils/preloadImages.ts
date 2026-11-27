@@ -39,6 +39,15 @@ function preloadOne(url: string): Promise<void> {
 }
 
 /**
+ * Fetches and decodes one image right away, once: the backdrop of a page about to open,
+ * asked for as soon as the pointer or the keyboard reaches its poster.
+ */
+export function preloadImage(url: string | null | undefined): void {
+  if (!url || preloaded.has(url) || inFlight.has(url)) return;
+  void preloadOne(url);
+}
+
+/**
  * Preloads `urls` in order, a few at a time and only while the main thread is idle.
  * Returns a cancel function: pending batches are dropped, images already requested finish.
  */

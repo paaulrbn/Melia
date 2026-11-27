@@ -325,14 +325,15 @@ export function MovieDetailView({
       fanartUrl={fanartUrl}
       posterUrl={posterUrl}
       credit={
-        directors.length > 0 ? (
+        directors.names.length > 0 ? (
           <>
             {/* The name alone on screen, with its meaning for screen readers */}
             <span className="sr-only">Réalisé par </span>
-            {formatNameList(directors)}
+            {formatNameList(directors.names)}
           </>
         ) : undefined
       }
+      isCreditLoading={directors.isLoading}
       facts={
         <>
           {movie.year > 0 && <li>{movie.year}</li>}

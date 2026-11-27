@@ -1,6 +1,8 @@
 import type { MouseEvent } from 'react';
 import { DownloadInfo, LookupMovie, Movie, QueueRecord } from '../../types';
 import { getImageUrl } from '../../utils/media';
+import { preloadImage } from '../../utils/preloadImages';
+import { prefetchMovieDirectors } from '../../hooks/useMovieDirectors';
 import { Play, Plus } from 'lucide-react';
 import { Poster, ProgressBar } from '../ui';
 
@@ -21,6 +23,13 @@ export function MovieCard({
 }: Readonly<MovieCardProps>) {
   const posterUrl = getImageUrl(movie, 'poster');
 
+  // What the movie's page shows is asked for as soon as the poster is aimed at, so it is
+  // ready when the page opens: the backdrop and the directors
+  const prepareDetail = () => {
+    preloadImage(getImageUrl(movie, 'fanart'));
+    if ('id' in movie && typeof movie.id === 'number') prefetchMovieDirectors(movie.id);
+  };
+
   // Calculate Radarr queue progress if applicable
   let serverProgress = 0;
   if (queueItem && queueItem.size > 0) {
@@ -34,6 +43,8 @@ export function MovieCard({
       // Library poster: found again to take back the focus when its detail page closes
       data-movie-id={'id' in movie ? movie.id : undefined}
       onClick={onClick}
+      onPointerEnter={prepareDetail}
+      onFocus={prepareDetail}
     >
       {posterUrl && <Poster src={posterUrl} alt={movie.title} />}
       <div className="movie-overlay">

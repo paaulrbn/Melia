@@ -1,8 +1,8 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ChevronsUpDown } from 'lucide-react';
 import { useImageStatus } from '../../hooks/useImageStatus';
 import type { QualityProfile } from '../../types';
-import { TransferBar, type TransferState } from '../ui';
+import { Poster, TransferBar, type TransferState } from '../ui';
 
 interface QualityPickerProps {
   readonly profiles: QualityProfile[];
@@ -109,6 +109,8 @@ interface MediaDetailLayoutProps {
   readonly posterUrl: string | null;
   /** Line between the title and the facts (director, network); nothing when absent. */
   readonly credit?: ReactNode;
+  /** The credit is on its way: its line is kept empty, so nothing moves when it arrives */
+  readonly isCreditLoading?: boolean;
   /** `<li>` items: year, duration, size… */
   readonly facts: ReactNode;
   /** Main action, or what stands in for it */
@@ -132,6 +134,7 @@ export function MediaDetailLayout({
   fanartUrl,
   posterUrl,
   credit,
+  isCreditLoading = false,
   facts,
   primary,
   notices,
@@ -140,6 +143,9 @@ export function MediaDetailLayout({
   children,
 }: Readonly<MediaDetailLayoutProps>) {
   const backdropStatus = useImageStatus(fanartUrl);
+  // The credit fades in only when it arrives after the page opened; known at once, it is
+  // simply there
+  const [wasCreditPending] = useState(isCreditLoading);
 
   return (
     <article
@@ -157,12 +163,22 @@ export function MediaDetailLayout({
         )}
 
         <div className="media-detail-hero-inner">
-          {posterUrl && <img className="media-detail-poster" src={posterUrl} alt="" decoding="async" />}
+          {posterUrl && <Poster className="media-detail-poster" src={posterUrl} />}
           <div className="media-detail-intro">
             <h2 className="media-detail-title" id={MEDIA_DETAIL_HEADING_ID} tabIndex={-1}>
               {title}
             </h2>
-            {credit && <p className="media-detail-credit">{credit}</p>}
+            {credit ? (
+              <p className={`media-detail-credit${wasCreditPending ? ' media-detail-credit--arrived' : ''}`}>
+                {credit}
+              </p>
+            ) : (
+              isCreditLoading && (
+                <p className="media-detail-credit media-detail-credit--pending" aria-hidden="true">
+                  {' '}
+                </p>
+              )
+            )}
             <ul className="media-detail-facts" aria-label="Informations">
               {facts}
             </ul>

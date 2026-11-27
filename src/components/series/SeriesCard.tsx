@@ -1,6 +1,7 @@
 import type { MouseEvent } from 'react';
 import { LookupSeries, Series, UnifiedQueueItem } from '../../types';
 import { getImageUrl } from '../../utils/media';
+import { preloadImage } from '../../utils/preloadImages';
 import { formatSeasonCount } from '../../utils/series';
 import { Play, Plus } from 'lucide-react';
 import { Poster, ProgressBar } from '../ui';
@@ -11,6 +12,8 @@ interface SeriesCardProps {
   readonly queueItems?: UnifiedQueueItem[];
   readonly isAddHint?: boolean;
   readonly onClick: (event: MouseEvent<HTMLButtonElement>) => void;
+  /** Poster aimed at: the page's episodes can be asked for ahead of time */
+  readonly onPrepare?: (seriesId: number) => void;
 }
 
 export function SeriesCard({
@@ -19,8 +22,16 @@ export function SeriesCard({
   queueItems = [],
   isAddHint = false,
   onClick,
+  onPrepare,
 }: Readonly<SeriesCardProps>) {
   const posterUrl = getImageUrl(series, 'poster');
+
+  // What the series' page shows is asked for as soon as the poster is aimed at, so it is
+  // ready when the page opens: the backdrop and the episodes
+  const prepareDetail = () => {
+    preloadImage(getImageUrl(series, 'fanart'));
+    if ('id' in series && typeof series.id === 'number') onPrepare?.(series.id);
+  };
 
   let seasonCount = 0;
   if ('statistics' in series && series.statistics?.seasonCount) {
@@ -43,6 +54,8 @@ export function SeriesCard({
       // Library poster: found again to take back the focus when its detail page closes
       data-series-id={'id' in series ? series.id : undefined}
       onClick={onClick}
+      onPointerEnter={prepareDetail}
+      onFocus={prepareDetail}
     >
       {posterUrl && <Poster src={posterUrl} alt={series.title} />}
       <div className="movie-overlay">

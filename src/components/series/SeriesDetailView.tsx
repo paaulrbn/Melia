@@ -151,6 +151,8 @@ export function SeriesDetailView({
     [seasonEpisodes, queueByEpisodeId]
   );
 
+  const isLoadingEpisodesNow = isLoadingEpisodes && episodes.length === 0;
+
   const firstPlayableEpisode = useMemo(
     () =>
       sortEpisodes(episodes).find(ep => {
@@ -239,24 +241,29 @@ export function SeriesDetailView({
       );
     }
 
-    const isLoading = isLoadingEpisodes && episodes.length === 0;
+    // Episodes on their way and the server has files: the play button's room is kept, so
+    // nothing moves when they arrive
+    if (isLoadingEpisodesNow && (series.statistics?.episodeFileCount ?? 0) > 0) {
+      return (
+        <div className="media-detail-actions">
+          <span className="media-detail-play media-detail-play--pending" aria-hidden="true">
+            <Play className="media-detail-play-icon" size={22} fill="currentColor" aria-hidden="true" />
+            Lancer S01E01
+          </span>
+          {deleteButton}
+        </div>
+      );
+    }
+
     return (
       <div className="media-detail-missing">
         <div className="media-detail-state">
-          {isLoading ? (
-            <Loader2 className="media-detail-state-icon animate-spin" size={20} aria-hidden="true" />
-          ) : (
-            <Info className="media-detail-state-icon" size={20} aria-hidden="true" />
-          )}
+          <Info className="media-detail-state-icon" size={20} aria-hidden="true" />
           <div className="media-detail-state-text">
-            <p className="media-detail-state-title">
-              {isLoading ? 'Chargement des épisodes' : 'Aucun épisode disponible'}
+            <p className="media-detail-state-title">Aucun épisode disponible</p>
+            <p className="media-detail-state-detail">
+              Les épisodes téléchargés sur le serveur apparaîtront ici, prêts à être lancés.
             </p>
-            {!isLoading && (
-              <p className="media-detail-state-detail">
-                Les épisodes téléchargés sur le serveur apparaîtront ici, prêts à être lancés.
-              </p>
-            )}
           </div>
         </div>
         <div className="media-detail-actions">{deleteButton}</div>
@@ -265,11 +272,16 @@ export function SeriesDetailView({
   };
 
   const renderEpisodes = () => {
-    if (isLoadingEpisodes && episodes.length === 0) {
+    if (isLoadingEpisodesNow) {
+      // Empty rows as many as the season has episodes: the list fills in without moving
+      const season = series.seasons?.find(s => s.seasonNumber === activeSeason);
+      const count = season?.statistics?.totalEpisodeCount ?? 0;
       return (
-        <p className="episodes-empty" role="status">
-          Chargement des épisodes…
-        </p>
+        <ul className="dl-list episodes-list episodes-list--pending" aria-hidden="true">
+          {Array.from({ length: count }, (_, index) => (
+            <li key={index} className="episodes-placeholder" />
+          ))}
+        </ul>
       );
     }
     if (seasonEpisodes.length === 0) {

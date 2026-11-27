@@ -160,6 +160,33 @@ export function useSeries({ config, downloads }: UseSeriesProps) {
     }
   }, [sonarrUrl, sonarrKey, episodesCache]);
 
+  // Episodes asked for ahead of time (poster aimed at): one request per series at a time,
+  // and no loading state, the page is not open yet
+  const prefetchingRef = useRef<Set<number>>(new Set());
+  const prefetchSeriesEpisodes = useCallback(
+    (seriesId: number) => {
+      if (!sonarrUrl || !sonarrKey) return;
+      if (episodesCache[seriesId]?.length || prefetchingRef.current.has(seriesId)) return;
+      prefetchingRef.current.add(seriesId);
+      Promise.all([fetchSonarrEpisodes(seriesId), fetchSonarrEpisodeFiles(seriesId)])
+        .then(([episodes, files]) => {
+          const filesMap = new Map(files.map(f => [f.id, f]));
+          const enriched = episodes.map(ep => ({
+            ...ep,
+            episodeFile: ep.episodeFileId ? filesMap.get(ep.episodeFileId) : undefined,
+          }));
+          if (enriched.length > 0) {
+            setEpisodesCache(prev => (prev[seriesId]?.length ? prev : { ...prev, [seriesId]: enriched }));
+          }
+        })
+        .catch(() => {
+          // The page loads them when it opens
+        })
+        .finally(() => prefetchingRef.current.delete(seriesId));
+    },
+    [sonarrUrl, sonarrKey, episodesCache]
+  );
+
   // Select a series (triggers lazy episode loading)
   const selectSeries = useCallback(async (s: Series | null) => {
     setSelectedSeries(s);
@@ -454,6 +481,7 @@ export function useSeries({ config, downloads }: UseSeriesProps) {
     findInLibrary,
     loadSeries,
     loadSeriesEpisodes,
+    prefetchSeriesEpisodes,
     isConfigured: Boolean(sonarrUrl && sonarrKey),
     hasLoaded,
     loadError,

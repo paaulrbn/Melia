@@ -21,6 +21,8 @@ interface SeriesViewProps {
   readonly onSelectSeries: (series: Series, trigger: HTMLElement) => void;
   /** Opens the page that adds a search result; `trigger` takes the focus back when it closes. */
   readonly onOpenAddSeries: (lookupSeries: LookupSeries, trigger: HTMLElement) => void;
+  /** A library poster is aimed at: its episodes can be loaded ahead of time */
+  readonly onPrepareSeries?: (seriesId: number) => void;
   readonly isConfigLoaded: boolean;
   readonly isConfigured: boolean;
   readonly hasLoaded: boolean;
@@ -39,6 +41,7 @@ export function SeriesView({
   findInLibrary,
   onSelectSeries,
   onOpenAddSeries,
+  onPrepareSeries,
   isConfigLoaded,
   isConfigured,
   hasLoaded,
@@ -164,6 +167,7 @@ export function SeriesView({
                   localEpisodeCount={localEpisodeCountBySeries.get(s.id) || 0}
                   queueItems={queueBySeriesId.get(s.id)}
                   onClick={event => onSelectSeries(s, event.currentTarget)}
+                  onPrepare={onPrepareSeries}
                 />
               ))}
             </div>

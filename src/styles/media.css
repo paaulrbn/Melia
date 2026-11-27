@@ -154,6 +154,10 @@
   line-height: 1.4;
   text-wrap: balance;
   overflow-wrap: break-word;
+}
+
+/* Arrived after the page opened, in the room kept for it */
+.media-detail-credit--arrived {
   animation: ui-fade-in var(--duration-fast) var(--ease-in-out) both;
 }
 
@@ -202,6 +206,11 @@
 /* Play: the one strong element of the page. Solid white fill with text and filled icon
    in the app background colour (19.8:1), the largest target; slightly grey on hover
    (15:1), pressed feedback. Solid, not translucent: the fanart never shows through. */
+/* Room of the play button while the episodes arrive */
+.media-detail-play--pending {
+  visibility: hidden;
+}
+
 .media-detail-play {
   display: inline-flex;
   align-items: center;
@@ -575,7 +584,7 @@
 .media-detail-overview {
   max-width: 65ch;
   margin: 0;
-  color: rgb(255 255 255 / 0.82);
+  color: #d6d6d6;
   font-size: var(--text-base);
   line-height: 1.6;
   text-wrap: pretty;

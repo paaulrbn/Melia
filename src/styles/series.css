@@ -25,7 +25,7 @@
 
 /* --------------------------------------------------------------------------
    Season tabs: segmented control, the pill slides to the chosen season
-   (transitions.dev tabs sliding). A long list scrolls sideways.
+   A long list scrolls sideways.
    -------------------------------------------------------------------------- */
 .season-tabs {
   min-width: 0;
@@ -118,6 +118,15 @@
   animation: ui-fade-in var(--duration-quick) var(--ease-in-out) both;
 }
 
+/* Episodes on their way: empty rows the size of an episode with its summary */
+.episodes-list--pending {
+  animation: none;
+}
+
+.episodes-placeholder {
+  height: 84px;
+}
+
 .episodes-empty {
   margin: 0;
   padding: var(--space-lg) 0;
@@ -127,7 +136,7 @@
 }
 
 /* Number in the poster column. A playable row shows a play icon in its place under the
-   pointer or the keyboard focus (transitions.dev icon swap: scale, opacity and blur). */
+   pointer or the keyboard focus (scale, opacity and blur swap). */
 .episode-index {
   position: relative;
   display: grid;
