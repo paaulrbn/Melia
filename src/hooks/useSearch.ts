@@ -2,6 +2,7 @@ import { useState, useRef, useCallback } from 'react';
 import { Config, LookupMovie, LookupSeries } from '../types';
 import { searchRadarrMovies } from '../services/radarr';
 import { searchSonarrSeries } from '../services/sonarr';
+import { searchKey } from '../utils/search';
 
 export function useSearch(config: Config) {
   // Movie search
@@ -10,6 +11,8 @@ export function useSearch(config: Config) {
   const [isMovieSearching, setIsMovieSearching] = useState(false);
   const movieTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const movieRequestIdRef = useRef(0);
+  // Key of the search running or shown: same key, same results, no new request
+  const movieKeyRef = useRef('');
 
   // Series search
   const [seriesSearchQuery, setSeriesSearchQuery] = useState('');
@@ -17,10 +20,15 @@ export function useSearch(config: Config) {
   const [isSeriesSearching, setIsSeriesSearching] = useState(false);
   const seriesTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seriesRequestIdRef = useRef(0);
+  const seriesKeyRef = useRef('');
 
   const handleMovieSearch = useCallback(
     (term: string) => {
       setMovieSearchQuery(term);
+      // Only the case or the spaces changed (autocorrect): keep the search as it is
+      const key = searchKey(term);
+      if (key === movieKeyRef.current) return;
+      movieKeyRef.current = key;
       if (movieTimer.current) clearTimeout(movieTimer.current);
       const requestId = ++movieRequestIdRef.current;
 
@@ -62,6 +70,7 @@ export function useSearch(config: Config) {
   );
 
   const clearMovieSearch = useCallback(() => {
+    movieKeyRef.current = '';
     movieRequestIdRef.current++;
     if (movieTimer.current) clearTimeout(movieTimer.current);
     setMovieSearchQuery('');
@@ -72,6 +81,9 @@ export function useSearch(config: Config) {
   const handleSeriesSearch = useCallback(
     (term: string) => {
       setSeriesSearchQuery(term);
+      const key = searchKey(term);
+      if (key === seriesKeyRef.current) return;
+      seriesKeyRef.current = key;
       if (seriesTimer.current) clearTimeout(seriesTimer.current);
       const requestId = ++seriesRequestIdRef.current;
 
@@ -113,6 +125,7 @@ export function useSearch(config: Config) {
   );
 
   const clearSeriesSearch = useCallback(() => {
+    seriesKeyRef.current = '';
     seriesRequestIdRef.current++;
     if (seriesTimer.current) clearTimeout(seriesTimer.current);
     setSeriesSearchQuery('');
